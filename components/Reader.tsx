@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { dictionaryProvider } from "@/lib/dictionary";
 import { estimateDifficulty, type DifficultyEstimate } from "@/lib/difficulty";
-import { beginReading, finishArticle, getArticle, getWordStates, recordLookup, saveArticleDifficulty, saveDifficultyFeedback, skipArticle } from "@/lib/storage";
+import { frequencyProvider } from "@/lib/frequency";
+import { beginReading, finishArticle, getArticle, getVocabularyProfile, getWordStates, recordLookup, saveArticleDifficulty, saveDifficultyFeedback, skipArticle } from "@/lib/storage";
 import { readingMinutes, tokenizePreservingText } from "@/lib/text";
 import type { Article, DictionaryResult, DifficultyFeedback } from "@/lib/types";
 
@@ -28,7 +29,8 @@ export function Reader({ id }: { id: string }) {
       setArticle(value);
       if (!started.current) {
         started.current = true;
-        const estimate = estimateDifficulty(value.content, await getWordStates());
+        const [wordStates, profile] = await Promise.all([getWordStates(), getVocabularyProfile()]);
+        const estimate = estimateDifficulty(value.content, wordStates, frequencyProvider, profile);
         setDifficulty(estimate);
         await saveArticleDifficulty(value.id, estimate.score);
         await beginReading(value);

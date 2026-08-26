@@ -1,4 +1,4 @@
-import type { WordState } from "./types.ts";
+import type { VocabularyProfile, WordState } from "./types.ts";
 import { frequencyProvider, type FrequencyProvider } from "./frequency.ts";
 import { tokenizePreservingText } from "./text.ts";
 
@@ -21,6 +21,7 @@ export function estimateDifficulty(
   content: string,
   wordStates: Iterable<WordState> = [],
   provider: FrequencyProvider = frequencyProvider,
+  profile?: VocabularyProfile | null,
 ): DifficultyEstimate {
   const words = tokenizePreservingText(content)
     .filter((token) => token.type === "word")
@@ -48,7 +49,7 @@ export function estimateDifficulty(
   let veryLowFamiliarityWords = 0;
   let rareWords = 0;
   for (const word of words) {
-    const familiarity = states.get(word)?.familiarity ?? provider.initialFamiliarity(word);
+    const familiarity = states.get(word)?.familiarity ?? provider.initialFamiliarity(word, profile);
     if (familiarity < 0.5) unknownWords += 1;
     if (familiarity < 0.28) veryLowFamiliarityWords += 1;
     if (provider.lookup(word).band === "rare") rareWords += 1;

@@ -2,6 +2,15 @@ export type ArticleStatus = "unread" | "reading" | "finished" | "skipped";
 export type DifficultyFeedback = "too_easy" | "suitable" | "too_hard";
 export type ReadingEventType = "opened" | "word_lookup" | "finished" | "skipped" | "difficulty_feedback";
 
+export type VocabularyProfile = {
+  id: "current";
+  estimatedBand: number;
+  frequencyThreshold: number;
+  confidence: number;
+  assessedAt: string;
+  assessmentVersion: number;
+};
+
 export type Article = {
   id: string;
   title: string;

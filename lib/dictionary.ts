@@ -34,7 +34,7 @@ class FreeDictionaryProvider implements DictionaryProvider {
 
   private async translate(word: string) {
     const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=en|zh-CN`;
-    const response = await fetch(url);
+    const response = await fetchWithTimeout(url);
     if (!response.ok) throw new Error("translation unavailable");
     const data = await response.json() as { responseData?: { translatedText?: string } };
     const value = data.responseData?.translatedText?.trim();
@@ -43,13 +43,17 @@ class FreeDictionaryProvider implements DictionaryProvider {
   }
 
   private async define(word: string) {
-    const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
+    const response = await fetchWithTimeout(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
     if (!response.ok) throw new Error("definition unavailable");
     const data = await response.json() as Array<{ phonetic?: string; meanings?: Array<{ definitions?: Array<{ definition?: string }> }> }>;
     const entry = data[0];
     const definition = entry?.meanings?.flatMap((meaning) => meaning.definitions ?? []).find((item) => item.definition)?.definition;
     return { phonetic: entry?.phonetic, definition };
   }
+}
+
+function fetchWithTimeout(url: string, timeoutMs = 4500) {
+  return fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
 }
 
 export const dictionaryProvider: DictionaryProvider = new FreeDictionaryProvider();

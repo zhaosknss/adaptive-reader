@@ -1,15 +1,16 @@
-import type { Article, DictionaryResult, DifficultyFeedback, ReadingEvent, ReadingEventType, WordState } from "./types";
+import type { Article, DictionaryResult, DifficultyFeedback, ReadingEvent, ReadingEventType, VocabularyProfile, WordState } from "./types";
 import { uniqueWords } from "./text";
 import { familiarityAfterExposure, familiarityAfterLookup } from "./familiarity";
 import { frequencyProvider } from "./frequency";
 
 const DB_NAME = "just-read";
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 const ARTICLES = "articles";
 const WORDS = "words";
 const DICTIONARY = "dictionary";
 const EXPOSURES = "exposures";
 const EVENTS = "events";
+const VOCABULARY_PROFILE = "vocabularyProfile";
 
 type WordExposure = {
   id: string;
@@ -54,6 +55,10 @@ function openDatabase(): Promise<IDBDatabase> {
         const store = db.createObjectStore(EVENTS, { keyPath: "id" });
         store.createIndex("articleId", "articleId");
         store.createIndex("timestamp", "timestamp");
+      }
+
+      if (!db.objectStoreNames.contains(VOCABULARY_PROFILE)) {
+        db.createObjectStore(VOCABULARY_PROFILE, { keyPath: "id" });
       }
     };
   });
@@ -118,6 +123,23 @@ export async function getWordStates(): Promise<WordState[]> {
   return values.map((value) => normalizeWordState(value, now));
 }
 
+export async function getVocabularyProfile(): Promise<VocabularyProfile | undefined> {
+  const db = await openDatabase();
+  const transaction = db.transaction(VOCABULARY_PROFILE, "readonly");
+  const value = await requestResult(transaction.objectStore(VOCABULARY_PROFILE).get("current")) as Partial<VocabularyProfile> | undefined;
+  await transactionDone(transaction);
+  db.close();
+  return value ? normalizeVocabularyProfile(value) : undefined;
+}
+
+export async function saveVocabularyProfile(profile: VocabularyProfile): Promise<void> {
+  const db = await openDatabase();
+  const transaction = db.transaction(VOCABULARY_PROFILE, "readwrite");
+  transaction.objectStore(VOCABULARY_PROFILE).put(normalizeVocabularyProfile(profile));
+  await transactionDone(transaction);
+  db.close();
+}
+
 export async function createArticle(title: string, content: string, sourceUrl?: string): Promise<Article> {
   const article: Article = {
     id: crypto.randomUUID(),
@@ -141,7 +163,7 @@ export async function createArticle(title: string, content: string, sourceUrl?: 
 
 export async function beginReading(article: Article): Promise<Article> {
   const db = await openDatabase();
-  const transaction = db.transaction([ARTICLES, WORDS, EXPOSURES, EVENTS], "readwrite");
+  const transaction = db.transaction([ARTICLES, WORDS, EXPOSURES, EVENTS, VOCABULARY_PROFILE], "readwrite");
   const articleStore = transaction.objectStore(ARTICLES);
   const wordStore = transaction.objectStore(WORDS);
   const exposureStore = transaction.objectStore(EXPOSURES);
@@ -149,10 +171,12 @@ export async function beginReading(article: Article): Promise<Article> {
   const articleRequest = requestResult(articleStore.get(article.id)) as Promise<Partial<Article> | undefined>;
   const wordsRequest = requestResult(wordStore.getAll()) as Promise<Partial<WordState>[]>;
   const exposureKeysRequest = requestResult(exposureStore.getAllKeys());
-  const [savedArticle, savedWords, exposureKeys] = await Promise.all([
+  const profileRequest = requestResult(transaction.objectStore(VOCABULARY_PROFILE).get("current")) as Promise<Partial<VocabularyProfile> | undefined>;
+  const [savedArticle, savedWords, exposureKeys, savedProfile] = await Promise.all([
     articleRequest,
     wordsRequest,
     exposureKeysRequest,
+    profileRequest,
   ]);
 
   const now = new Date().toISOString();
@@ -186,7 +210,7 @@ export async function beginReading(article: Article): Promise<Article> {
           firstSeenAt: previous.firstSeenAt ?? now,
           lastSeenAt: now,
         }
-      : initialWordState(normalizedWord, 1, now);
+      : initialWordState(normalizedWord, 1, now, savedProfile ? normalizeVocabularyProfile(savedProfile) : undefined);
 
     wordStore.put(nextWordState);
     wordStates.set(normalizedWord, nextWordState);
@@ -201,11 +225,16 @@ export async function beginReading(article: Article): Promise<Article> {
 export async function recordLookup(articleId: string, word: string): Promise<WordState> {
   const normalizedWord = word.toLocaleLowerCase("en-US").replace(/’/g, "'");
   const db = await openDatabase();
-  const transaction = db.transaction([WORDS, EVENTS], "readwrite");
+  const transaction = db.transaction([WORDS, EVENTS, VOCABULARY_PROFILE], "readwrite");
   const store = transaction.objectStore(WORDS);
   const now = new Date().toISOString();
-  const value = await requestResult(store.get(normalizedWord)) as Partial<WordState> | undefined;
-  const base = value ? normalizeWordState(value, now) : initialWordState(normalizedWord, 0, null);
+  const [value, savedProfile] = await Promise.all([
+    requestResult(store.get(normalizedWord)) as Promise<Partial<WordState> | undefined>,
+    requestResult(transaction.objectStore(VOCABULARY_PROFILE).get("current")) as Promise<Partial<VocabularyProfile> | undefined>,
+  ]);
+  const base = value
+    ? normalizeWordState(value, now)
+    : initialWordState(normalizedWord, 0, null, savedProfile ? normalizeVocabularyProfile(savedProfile) : undefined);
   const next: WordState = {
     ...base,
     lookupCount: base.lookupCount + 1,
@@ -343,16 +372,32 @@ function reseedLegacyWordState(value: Partial<WordState>, fallbackTime: string):
   return state;
 }
 
-function initialWordState(word: string, seenCount: number, seenAt: string | null): WordState {
+function initialWordState(
+  word: string,
+  seenCount: number,
+  seenAt: string | null,
+  profile?: VocabularyProfile,
+): WordState {
   return {
     word,
     normalizedWord: word,
     lookupCount: 0,
     seenCount,
-    familiarity: frequencyProvider.initialFamiliarity(word),
+    familiarity: frequencyProvider.initialFamiliarity(word, profile),
     firstSeenAt: seenAt,
     lastSeenAt: seenAt,
     lastLookupAt: null,
+  };
+}
+
+function normalizeVocabularyProfile(value: Partial<VocabularyProfile>): VocabularyProfile {
+  return {
+    id: "current",
+    estimatedBand: Math.min(5, Math.max(0, Math.round(value.estimatedBand ?? 2))),
+    frequencyThreshold: Math.min(0.9, Math.max(0.3, value.frequencyThreshold ?? 0.68)),
+    confidence: Math.min(1, Math.max(0, value.confidence ?? 0)),
+    assessedAt: value.assessedAt ?? new Date().toISOString(),
+    assessmentVersion: Math.max(1, Math.round(value.assessmentVersion ?? 1)),
   };
 }
 
