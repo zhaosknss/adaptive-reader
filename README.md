@@ -23,8 +23,9 @@
 9. 刷新页面或重启本地服务后，文章和阅读状态仍然存在。
 10. 首次打开会进行 20～25 词的轻量自适应判断，并保存一条 `VocabularyProfile`。
 11. 新遇到单词时会结合本地词频与 VocabularyPrior 初始化 familiarity；真实阅读行为随后逐渐覆盖先验。
+12. 完成判断后首页自动显示真实英文候选；点击时才抓取全文，读完或跳过会自然进入下一篇。
 
-当前还没有 RSS 内容池、兴趣模型或推荐算法。下一阶段是 Starter content pool 与 Cold-start Feed。
+当前已有基于可读性、freshness 和简单 diversity 的 Cold-start Feed。还没有 InterestProfile 或长期推荐学习；下一阶段从真实阅读事件建立兴趣模型。
 
 ## Windows 本地启动
 
@@ -57,6 +58,7 @@ pnpm build
 - `exposures`：以 `article + normalizedWord` 去重，避免刷新或 React 重渲染污染词汇模型。
 - `events`：保存打开、查词、读完、跳过和难度反馈，以及当前阅读时长等元数据。
 - `vocabularyProfile`：只保存当前用户的一条冷启动词汇先验，不为测评题目批量创建 `WordState`。
+- `candidates`：RSS/Atom 发现的轻量候选元数据；只有用户选择后才抓取正文并生成 `Article`。
 
 `familiarity` 只是一个简单、可解释的熟悉概率估计，不代表用户真正“掌握”了某个词。新文章中的重复曝光会轻微提高它，查询会降低它。
 
@@ -76,6 +78,8 @@ Reader 只依赖统一的 `DictionaryProvider` 接口。当前实现查询免费
 - `components/AppShell.tsx`、`components/Onboarding.tsx` — 首次入口与手机优先的自适应词汇判断
 - `components/Reader.tsx` — 阅读、点词、释义层、跳过与读完
 - `lib/assessment.ts`、`lib/assessment-items.ts` — 纯 TypeScript 测评状态机与小型分档词库
+- `lib/content-sources.ts`、`lib/feed.ts`、`lib/feed-ranking.ts` — 固定来源、RSS/Atom 解析和可解释冷启动排序
+- `app/api/feed/route.ts` — 带来源隔离、体积限制和超时的候选获取接口
 - `lib/storage.ts` — IndexedDB、数据迁移与曝光去重
 - `lib/text.ts` — 保留原始文本的 token 化
 - `lib/dictionary.ts` — 可替换的 `DictionaryProvider`
@@ -104,4 +108,4 @@ Reader 只依赖统一的 `DictionaryProvider` 接口。当前实现查询免费
 4. InterestProfile 与可解释 ranking
 5. Exploration、diversity 与 PWA
 
-当前开发阶段、已验证基线和不可破坏的实现边界记录在 `docs/PROJECT_STATE.md`。
+前 3 项已经完成。当前开发阶段、已验证基线和不可破坏的实现边界记录在 `docs/PROJECT_STATE.md`；内容来源边界见 `docs/CONTENT_SOURCES.md`。

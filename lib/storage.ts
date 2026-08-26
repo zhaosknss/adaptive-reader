@@ -1,16 +1,17 @@
-import type { Article, DictionaryResult, DifficultyFeedback, ReadingEvent, ReadingEventType, VocabularyProfile, WordState } from "./types";
+import type { Article, CandidateArticle, CandidateStatus, DictionaryResult, DifficultyFeedback, ReadingEvent, ReadingEventType, VocabularyProfile, WordState } from "./types";
 import { uniqueWords } from "./text";
 import { familiarityAfterExposure, familiarityAfterLookup } from "./familiarity";
 import { frequencyProvider } from "./frequency";
 
 const DB_NAME = "just-read";
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 const ARTICLES = "articles";
 const WORDS = "words";
 const DICTIONARY = "dictionary";
 const EXPOSURES = "exposures";
 const EVENTS = "events";
 const VOCABULARY_PROFILE = "vocabularyProfile";
+const CANDIDATES = "candidates";
 
 type WordExposure = {
   id: string;
@@ -59,6 +60,12 @@ function openDatabase(): Promise<IDBDatabase> {
 
       if (!db.objectStoreNames.contains(VOCABULARY_PROFILE)) {
         db.createObjectStore(VOCABULARY_PROFILE, { keyPath: "id" });
+      }
+
+      if (!db.objectStoreNames.contains(CANDIDATES)) {
+        const store = db.createObjectStore(CANDIDATES, { keyPath: "id" });
+        store.createIndex("status", "status");
+        store.createIndex("discoveredAt", "discoveredAt");
       }
     };
   });
@@ -136,6 +143,40 @@ export async function saveVocabularyProfile(profile: VocabularyProfile): Promise
   const db = await openDatabase();
   const transaction = db.transaction(VOCABULARY_PROFILE, "readwrite");
   transaction.objectStore(VOCABULARY_PROFILE).put(normalizeVocabularyProfile(profile));
+  await transactionDone(transaction);
+  db.close();
+}
+
+export async function listCandidateArticles(): Promise<CandidateArticle[]> {
+  const db = await openDatabase();
+  const transaction = db.transaction(CANDIDATES, "readonly");
+  const values = await requestResult(transaction.objectStore(CANDIDATES).getAll()) as Partial<CandidateArticle>[];
+  await transactionDone(transaction);
+  db.close();
+  return values.map(normalizeCandidate).sort((left, right) =>
+    (right.publishedAt ?? right.discoveredAt).localeCompare(left.publishedAt ?? left.discoveredAt));
+}
+
+export async function upsertCandidateArticles(candidates: readonly CandidateArticle[]): Promise<void> {
+  if (!candidates.length) return;
+  const db = await openDatabase();
+  const transaction = db.transaction(CANDIDATES, "readwrite");
+  const store = transaction.objectStore(CANDIDATES);
+  const existing = await requestResult(store.getAll()) as Partial<CandidateArticle>[];
+  const statusById = new Map(existing.map((candidate) => [candidate.id, normalizeCandidate(candidate).status]));
+  for (const candidate of candidates) {
+    store.put(normalizeCandidate({ ...candidate, status: statusById.get(candidate.id) ?? candidate.status }));
+  }
+  await transactionDone(transaction);
+  db.close();
+}
+
+export async function setCandidateStatus(id: string, status: CandidateStatus): Promise<void> {
+  const db = await openDatabase();
+  const transaction = db.transaction(CANDIDATES, "readwrite");
+  const store = transaction.objectStore(CANDIDATES);
+  const value = await requestResult(store.get(id)) as Partial<CandidateArticle> | undefined;
+  if (value) store.put({ ...normalizeCandidate(value), status });
   await transactionDone(transaction);
   db.close();
 }
@@ -398,6 +439,23 @@ function normalizeVocabularyProfile(value: Partial<VocabularyProfile>): Vocabula
     confidence: Math.min(1, Math.max(0, value.confidence ?? 0)),
     assessedAt: value.assessedAt ?? new Date().toISOString(),
     assessmentVersion: Math.max(1, Math.round(value.assessmentVersion ?? 1)),
+  };
+}
+
+function normalizeCandidate(value: Partial<CandidateArticle>): CandidateArticle {
+  const status = value.status === "dismissed" || value.status === "imported" ? value.status : "available";
+  return {
+    id: value.id ?? crypto.randomUUID(),
+    sourceId: value.sourceId ?? "unknown",
+    sourceName: value.sourceName?.trim() || "Unknown source",
+    topic: value.topic?.trim() || "General",
+    title: value.title?.trim() || "Untitled article",
+    url: value.url ?? "",
+    summary: value.summary?.trim() ?? "",
+    author: value.author?.trim() || null,
+    publishedAt: value.publishedAt ?? null,
+    discoveredAt: value.discoveredAt ?? new Date().toISOString(),
+    status,
   };
 }
 

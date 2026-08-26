@@ -11,6 +11,30 @@ export type VocabularyProfile = {
   assessmentVersion: number;
 };
 
+export type CandidateStatus = "available" | "dismissed" | "imported";
+
+export type CandidateArticle = {
+  id: string;
+  sourceId: string;
+  sourceName: string;
+  topic: string;
+  title: string;
+  url: string;
+  summary: string;
+  author: string | null;
+  publishedAt: string | null;
+  discoveredAt: string;
+  status: CandidateStatus;
+};
+
+export type ContentSourceDefinition = {
+  id: string;
+  name: string;
+  topic: string;
+  feedUrl: string;
+  siteUrl: string;
+};
+
 export type Article = {
   id: string;
   title: string;

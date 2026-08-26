@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { prepareCandidateArticle } from "@/lib/candidate-import";
 import { dictionaryProvider } from "@/lib/dictionary";
 import { estimateDifficulty, type DifficultyEstimate } from "@/lib/difficulty";
+import { rankColdStartCandidates } from "@/lib/feed-ranking";
 import { frequencyProvider } from "@/lib/frequency";
-import { beginReading, finishArticle, getArticle, getVocabularyProfile, getWordStates, recordLookup, saveArticleDifficulty, saveDifficultyFeedback, skipArticle } from "@/lib/storage";
+import { beginReading, finishArticle, getArticle, getVocabularyProfile, getWordStates, listCandidateArticles, recordLookup, saveArticleDifficulty, saveDifficultyFeedback, skipArticle } from "@/lib/storage";
 import { readingMinutes, tokenizePreservingText } from "@/lib/text";
 import type { Article, DictionaryResult, DifficultyFeedback } from "@/lib/types";
 
@@ -56,13 +58,28 @@ export function Reader({ id }: { id: string }) {
   async function markFinished() {
     setFinishing(true);
     await finishArticle(id, sessionDurationSeconds());
-    window.location.assign("/?finished=1");
+    await moveToNextArticle("finished");
   }
 
   async function skip() {
     setFinishing(true);
     await skipArticle(id, sessionDurationSeconds());
-    window.location.assign("/?skipped=1");
+    await moveToNextArticle("skipped");
+  }
+
+  async function moveToNextArticle(result: "finished" | "skipped") {
+    try {
+      const [candidates, profile] = await Promise.all([listCandidateArticles(), getVocabularyProfile()]);
+      const next = rankColdStartCandidates(candidates, profile)[0]?.candidate;
+      if (next) {
+        const nextArticle = await prepareCandidateArticle(next);
+        window.location.assign(`/read/${nextArticle.id}`);
+        return;
+      }
+    } catch {
+      // Returning to For You keeps the current result saved and lets the user retry.
+    }
+    window.location.assign(`/?${result}=1`);
   }
 
   async function rateDifficulty(feedback: DifficultyFeedback) {
@@ -146,7 +163,7 @@ export function Reader({ id }: { id: string }) {
             </div>
           </div>
           <button className="primary-button" onClick={() => void markFinished()} disabled={finishing}>
-            {finishing ? "正在保存…" : "标记为已读完"} <span>→</span>
+            {finishing ? "正在准备下一篇…" : "读完，下一篇"} <span>→</span>
           </button>
         </footer>
       </article>

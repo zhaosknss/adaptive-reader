@@ -2,13 +2,28 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { createArticle, findArticleBySourceUrl, listArticles } from "@/lib/storage";
+import { prepareCandidateArticle } from "@/lib/candidate-import";
+import { rankColdStartCandidates, type RankedCandidate } from "@/lib/feed-ranking";
+import {
+  createArticle,
+  findArticleBySourceUrl,
+  getVocabularyProfile,
+  listArticles,
+  listCandidateArticles,
+  setCandidateStatus,
+  upsertCandidateArticles,
+} from "@/lib/storage";
 import { previewText, readingMinutes } from "@/lib/text";
-import type { Article, ExtractedArticle } from "@/lib/types";
+import type { Article, CandidateArticle, ExtractedArticle, VocabularyProfile } from "@/lib/types";
 
 export function HomeFeed() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
+  const [feedLoading, setFeedLoading] = useState(true);
+  const [feedError, setFeedError] = useState("");
+  const [candidateError, setCandidateError] = useState("");
+  const [candidates, setCandidates] = useState<RankedCandidate[]>([]);
+  const [importingCandidateId, setImportingCandidateId] = useState<string | null>(null);
   const [showComposer, setShowComposer] = useState(false);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -20,11 +35,12 @@ export function HomeFeed() {
 
   useEffect(() => {
     let active = true;
-    void listArticles().then((saved) => {
-      if (active) {
-        setArticles(saved);
-        setLoading(false);
-      }
+    void Promise.all([listArticles(), listCandidateArticles(), getVocabularyProfile()]).then(async ([savedArticles, savedCandidates, profile]) => {
+      if (!active) return;
+      setArticles(savedArticles);
+      setCandidates(rankColdStartCandidates(savedCandidates, profile));
+      setLoading(false);
+      await refreshFeed(profile, () => active);
     });
     return () => { active = false; };
   }, []);
@@ -72,6 +88,41 @@ export function HomeFeed() {
     }
   }
 
+  async function refreshFeed(profile?: VocabularyProfile, isActive: () => boolean = () => true) {
+    setFeedLoading(true);
+    setFeedError("");
+    try {
+      const response = await fetch("/api/feed");
+      const result = await response.json() as { candidates?: CandidateArticle[] };
+      if (!response.ok || !result.candidates) throw new Error("暂时无法更新文章");
+      await upsertCandidateArticles(result.candidates);
+      const saved = await listCandidateArticles();
+      if (isActive()) setCandidates(rankColdStartCandidates(saved, profile));
+    } catch {
+      if (isActive()) setFeedError("暂时连不上内容源，已保留本机现有文章。稍后可以重试。");
+    } finally {
+      if (isActive()) setFeedLoading(false);
+    }
+  }
+
+  async function readCandidate(candidate: CandidateArticle) {
+    if (importingCandidateId) return;
+    setImportingCandidateId(candidate.id);
+    setCandidateError("");
+    try {
+      const article = await prepareCandidateArticle(candidate);
+      window.location.assign(`/read/${article.id}`);
+    } catch (reason) {
+      setCandidateError(reason instanceof Error ? reason.message : "无法读取这篇文章");
+      setImportingCandidateId(null);
+    }
+  }
+
+  async function dismissCandidate(id: string) {
+    await setCandidateStatus(id, "dismissed");
+    setCandidates((current) => current.filter((item) => item.candidate.id !== id));
+  }
+
   return (
     <main className="home-shell">
       <header className="topbar">
@@ -82,10 +133,48 @@ export function HomeFeed() {
       </header>
 
       <section className="hero">
-        <p className="eyebrow">ENGLISH READING</p>
-        <h1>不用学。<br />只管读。</h1>
-        <p>放进一篇你真正想读的英文。不懂的词点一下，其他时间只阅读。</p>
-        <button className="primary-button" onClick={() => setShowComposer(true)}>添加一篇英文 <span>→</span></button>
+        <p className="eyebrow">FOR YOU</p>
+        <h1>不用找。<br />直接读。</h1>
+        <p>真实英文内容会自动出现在这里。难度先参考你的词汇起点，之后再由真实阅读行为慢慢修正。</p>
+      </section>
+
+      <section className="for-you" aria-live="polite">
+        <div className="section-heading">
+          <h2>为你挑选</h2><span>{feedLoading ? "正在更新" : "真实英文内容"}</span>
+        </div>
+        {candidateError && <p className="feed-message error" role="alert">{candidateError}</p>}
+        {candidates.length ? (
+          <div className="feed-grid">
+            {candidates.slice(0, 8).map((item) => (
+              <article className="feed-card" key={item.candidate.id}>
+                <div className="feed-card-meta">
+                  <span>{item.candidate.sourceName}</span>
+                  <span>{item.candidate.topic}</span>
+                </div>
+                <h2>{item.candidate.title}</h2>
+                {item.candidate.summary && <p>{item.candidate.summary}</p>}
+                <div className="feed-card-details">
+                  <span>{difficultyLabel(item.difficultyLabel)}</span>
+                  <span>约 {item.estimatedMinutes} 分钟</span>
+                  <span>{publishedLabel(item.candidate.publishedAt)}</span>
+                </div>
+                <div className="feed-card-actions">
+                  <button className="primary-button" onClick={() => void readCandidate(item.candidate)} disabled={Boolean(importingCandidateId)}>
+                    {importingCandidateId === item.candidate.id ? "正在准备正文…" : "阅读"} <span>→</span>
+                  </button>
+                  <button className="quiet-button" onClick={() => void dismissCandidate(item.candidate.id)}>跳过</button>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : feedLoading ? (
+          <div className="feed-skeleton"><span /><span /><span /></div>
+        ) : (
+          <div className="feed-message">
+            <p>{feedError || "暂时没有新的候选文章。"}</p>
+            <button className="secondary-button" onClick={() => void getVocabularyProfile().then((profile) => refreshFeed(profile))}>重新获取</button>
+          </div>
+        )}
       </section>
 
       <section className="library" aria-live="polite">
@@ -148,6 +237,16 @@ export function HomeFeed() {
 
 function statusLabel(status: Article["status"]) {
   return status === "finished" ? "已读完" : status === "skipped" ? "已跳过" : status === "reading" ? "阅读中" : "未读";
+}
+
+function difficultyLabel(label: RankedCandidate["difficultyLabel"]) {
+  return label === "easy" ? "轻松" : label === "hard" ? "稍有挑战" : "适合现在";
+}
+
+function publishedLabel(value: string | null) {
+  if (!value) return "新发现";
+  const days = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 86_400_000));
+  return days === 0 ? "今天" : days === 1 ? "昨天" : `${days} 天前`;
 }
 
 const SAMPLE_PLACEHOLDER = "Paste the English article here.\n\nKeep the original paragraphs. Punctuation and spacing will stay exactly where they belong.";
