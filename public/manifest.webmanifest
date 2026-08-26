@@ -1,0 +1,10 @@
+{
+  "name": "Just Read · 英文阅读",
+  "short_name": "Just Read",
+  "description": "粘贴一篇英文，安静地读。",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f3efe5",
+  "theme_color": "#f3efe5",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
