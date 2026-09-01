@@ -1,11 +1,20 @@
-import { createArticle, findArticleBySourceUrl, setCandidateStatus } from "./storage";
-import type { Article, CandidateArticle, ExtractedArticle } from "./types";
+import { createArticle, findArticleByCandidateId, findArticleBySourceUrl, linkCandidateToArticle } from "./storage.ts";
+import { getBuiltinReading } from "./builtin-readings.ts";
+import type { Article, CandidateArticle, ExtractedArticle } from "./types.ts";
 
 export async function prepareCandidateArticle(candidate: CandidateArticle): Promise<Article> {
+  const linked = await findArticleByCandidateId(candidate.id);
+  if (linked) return linkCandidateToArticle(candidate, linked.id);
+
   const existing = await findArticleBySourceUrl(candidate.url);
   if (existing) {
-    await setCandidateStatus(candidate.id, "imported");
-    return existing;
+    return linkCandidateToArticle(candidate, existing.id);
+  }
+
+  const builtin = getBuiltinReading(candidate.contentId);
+  if (builtin) {
+    const article = await createArticle(builtin.title, builtin.content, builtin.sourceUrl);
+    return linkCandidateToArticle(candidate, article.id);
   }
 
   const response = await fetch("/api/extract", {
@@ -19,6 +28,5 @@ export async function prepareCandidateArticle(candidate: CandidateArticle): Prom
   }
   const duplicate = await findArticleBySourceUrl(result.sourceUrl);
   const article = duplicate ?? await createArticle(result.title, result.content, result.sourceUrl);
-  await setCandidateStatus(candidate.id, "imported");
-  return article;
+  return linkCandidateToArticle(candidate, article.id);
 }

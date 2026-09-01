@@ -1,4 +1,5 @@
 import { STARTER_SOURCES } from "@/lib/content-sources";
+import { builtinReadingCandidates } from "@/lib/builtin-readings";
 import { parseFeed } from "@/lib/feed";
 import type { CandidateArticle, ContentSourceDefinition } from "@/lib/types";
 
@@ -10,13 +11,18 @@ export async function GET() {
   const results = await Promise.allSettled(
     STARTER_SOURCES.map((source) => fetchSource(source, discoveredAt)),
   );
+  const builtinCandidates = builtinReadingCandidates(discoveredAt);
   const candidates = deduplicate(
-    results.flatMap((result) => result.status === "fulfilled" ? result.value : []),
+    [...builtinCandidates, ...results.flatMap((result) => result.status === "fulfilled" ? result.value : [])],
   ).sort((left, right) => (right.publishedAt ?? right.discoveredAt).localeCompare(left.publishedAt ?? left.discoveredAt));
   const failedSourceCount = results.filter((result) => result.status === "rejected").length;
 
   return Response.json(
-    { candidates, failedSourceCount, sourceCount: STARTER_SOURCES.length },
+    {
+      candidates,
+      failedSourceCount,
+      sourceCount: STARTER_SOURCES.length + new Set(builtinCandidates.map((candidate) => candidate.sourceId)).size,
+    },
     { headers: { "Cache-Control": "public, max-age=300" } },
   );
 }

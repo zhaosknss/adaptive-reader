@@ -3,7 +3,7 @@ import test from "node:test";
 import { familiarityAfterExposure, familiarityAfterLookup } from "../lib/familiarity.ts";
 import { estimateDifficulty } from "../lib/difficulty.ts";
 import { frequencyProvider } from "../lib/frequency.ts";
-import { normalizeWord, tokenizePreservingText, uniqueWords } from "../lib/text.ts";
+import { normalizeWord, readingParagraphs, tokenizePreservingText, uniqueWords } from "../lib/text.ts";
 
 test("tokenization preserves every character and punctuation", () => {
   const input = `Hello, world! Don't break punctuation — ever.`;
@@ -29,15 +29,31 @@ test("tokenization preserves contractions, hyphens, entities, quotes, and paragr
   ]);
 });
 
+test("reader removes only a first paragraph that repeats the article title", () => {
+  const title = "The Quiet Art of Reading";
+  assert.deepEqual(
+    readingParagraphs(title, "The Quiet Art of Reading\n\nThis is the real opening paragraph."),
+    ["This is the real opening paragraph."],
+  );
+  assert.deepEqual(
+    readingParagraphs(title, "The Quiet Art of Reading!\n\nThis is the real opening paragraph."),
+    ["This is the real opening paragraph."],
+  );
+  assert.deepEqual(
+    readingParagraphs(title, "A different opening paragraph.\n\nThe article continues."),
+    ["A different opening paragraph.", "The article continues."],
+  );
+});
+
 test("lookup lowers familiarity but never below the floor", () => {
-  assert.equal(familiarityAfterLookup(0.6), 0.48);
+  assert.equal(familiarityAfterLookup(0.6), 0.52);
   assert.equal(familiarityAfterLookup(0.1), 0.05);
   assert.equal(familiarityAfterLookup(0.05), 0.05);
 });
 
 test("a new exposure raises familiarity slowly but keeps a ceiling", () => {
-  assert.equal(familiarityAfterExposure(0.6), 0.62);
-  assert.equal(familiarityAfterExposure(0.94), 0.95);
+  assert.equal(familiarityAfterExposure(0.6), 0.602);
+  assert.equal(familiarityAfterExposure(0.94), 0.942);
   assert.equal(familiarityAfterExposure(0.95), 0.95);
 });
 

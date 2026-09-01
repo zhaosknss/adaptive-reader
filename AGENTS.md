@@ -6,7 +6,7 @@
 
 - 继续维护当前项目，不重新初始化，不创建第二套实现。
 - 保留已经验证的 Reader、手动粘贴、URL 导入、DictionaryProvider、WordState、个性化难度、ReadingEvent 和 IndexedDB 数据。
-- 产品默认路径是 Onboarding → For You Feed → Reader → Next Article；手动粘贴和 URL 导入只是次级的 Add Content 能力。
+- 产品默认路径是 Onboarding → 阅读一级页“开始阅读” → Reader → 难度反馈/下一篇；底部只保留“阅读 / 我的”，手动粘贴和 URL 导入收在“我的”内。
 - Vocabulary/Readability Profile 与 Interest Profile 分开建模，只在 ranking 层组合。
 - 核心算法优先写成纯 TypeScript；浏览器存储、React 状态和网络访问留在边界层。
 - Web 与手机优先，核心交互必须实际检查 390×844 和一个更窄的 Android 尺寸。

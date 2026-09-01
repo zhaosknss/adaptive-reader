@@ -37,6 +37,7 @@ export function parseFeed(
       publishedAt,
       discoveredAt,
       status: "available" as const,
+      articleId: null,
     }];
   });
 }

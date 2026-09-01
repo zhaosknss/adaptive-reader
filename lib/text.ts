@@ -28,6 +28,23 @@ export function readingMinutes(text: string) {
   return Math.max(1, Math.ceil(words / 180));
 }
 
+export function readingParagraphs(title: string, content: string) {
+  const paragraphs = content.split(/\n\s*\n+/).map((item) => item.trim()).filter(Boolean);
+  if (paragraphs.length === 0) return paragraphs;
+
+  const comparableTitle = comparableText(title);
+  const comparableFirstParagraph = comparableText(paragraphs[0]);
+  return comparableTitle && comparableTitle === comparableFirstParagraph ? paragraphs.slice(1) : paragraphs;
+}
+
+function comparableText(value: string) {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase("en-US")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+}
+
 export function previewText(text: string, length = 150) {
   const compact = text.replace(/\s+/g, " ").trim();
   return compact.length > length ? `${compact.slice(0, length).trimEnd()}…` : compact;
