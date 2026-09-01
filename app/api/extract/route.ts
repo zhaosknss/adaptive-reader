@@ -32,7 +32,7 @@ async function fetchHtml(initialUrl: URL) {
         },
       });
     } catch (error) {
-      if (error instanceof Error && error.name === "TimeoutError") throw new Error("网页请求超时，请稍后重试");
+      if (error instanceof Error && error.name === "TimeoutError") throw new Error("网页请求超时");
       throw new Error("无法连接这个网页");
     }
 

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from "react";
 /* eslint-disable @next/next/no-html-link-for-pages -- Vinext's production Link prefetch currently throws during setup. */
 import { prepareCandidateArticle } from "@/lib/candidate-import";
-import { dictionaryProvider } from "@/lib/dictionary";
+import { dictionaryProvider, NO_CHINESE_DEFINITION } from "@/lib/dictionary";
 import { compactDefinition } from "@/lib/definition-display";
 import { estimateDifficulty, type DifficultyEstimate } from "@/lib/difficulty";
 import { RANKING_WEIGHTS, rankColdStartCandidates, recommendationSlate } from "@/lib/feed-ranking";
@@ -158,7 +158,7 @@ export function Reader({
       if (lookupRequestId.current === requestId) setDefinition(result);
       void recordLookup(id, word, {
         contextHash,
-        dictionarySucceeded: result.source !== "fallback" && result.translation !== "暂无中文释义",
+        dictionarySucceeded: result.source !== "fallback" && result.translation !== NO_CHINESE_DEFINITION,
         timestamp: lookupTimestamp,
       }).catch(() => {
         // A local persistence error should not block the definition from appearing.
@@ -245,7 +245,7 @@ export function Reader({
   }
 
   if (missing) {
-    return <main className="reader-state"><p>这篇文章不在本机了。</p><a href="/">返回首页</a></main>;
+    return <main className="reader-state"><p>未找到这篇文章</p><a href="/">返回阅读</a></main>;
   }
 
   if (!article) {
@@ -278,7 +278,7 @@ export function Reader({
               </a>
             )}
           </div>
-          <div className="reader-rule"><span />点击任意英文单词查看释义</div>
+          <div className="reader-rule"><span />点词查看释义</div>
         </header>
 
         <section className="reader-copy" aria-label="英文正文" ref={readerCopyRef}>
@@ -300,7 +300,7 @@ export function Reader({
         <footer className="finish-block">
           <span className="finish-ornament">J</span>
           <div className="difficulty-feedback" aria-label="文章难度反馈">
-            <span>这篇对你来说</span>
+            <span>文章难度</span>
             <div>
               {DIFFICULTY_OPTIONS.map((option) => (
                 <button

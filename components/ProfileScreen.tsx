@@ -28,9 +28,9 @@ export function ProfileScreen() {
       </header>
 
       <nav className="profile-menu" aria-label="我的内容">
-        <ProfileMenuLink href="/me/vocabulary" title="词汇量评级" detail={profile ? `${vocabularyBand(profile.estimatedBand)} · Level ${profile.estimatedBand}` : "尚未测试"} />
-        <ProfileMenuLink href="/me/words" title="点过的词" detail={wordCount === null ? "正在读取" : `${wordCount} 个`} />
-        <ProfileMenuLink href="/me/articles" title="阅读的文章" detail={articleCount === null ? "正在读取" : `${articleCount} 篇`} />
+        <ProfileMenuLink href="/me/vocabulary" title="阅读词汇水平" detail={profile ? `${vocabularyBand(profile.estimatedBand)} · ${profile.estimatedBand} / 5` : "未测试"} />
+        <ProfileMenuLink href="/me/words" title="点过的词" detail={wordCount === null ? undefined : `${wordCount} 个`} />
+        <ProfileMenuLink href="/me/articles" title="阅读的文章" detail={articleCount === null ? undefined : `${articleCount} 篇`} />
         <ProfileMenuLink href="/me/preferences" title="阅读偏好" />
         <ProfileMenuLink href="/me/appearance" title="外观" />
         <ProfileMenuLink href="/me/settings" title="设置" />

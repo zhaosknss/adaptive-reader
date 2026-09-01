@@ -64,7 +64,7 @@ export function ProfileDetailScreen({ section }: { section: string }) {
         <section className="profile-section vocabulary-card profile-detail-section profile-stage">
           <div className="vocabulary-stage-content">
             {loading ? <div className="loading-row" /> : profile ? (
-              <div className="vocabulary-rating"><strong>{vocabularyBand(profile.estimatedBand)}</strong><span>Level {profile.estimatedBand} / 5</span></div>
+              <div className="vocabulary-rating"><strong>{vocabularyBand(profile.estimatedBand)}</strong><span>等级 {profile.estimatedBand} / 5</span></div>
             ) : null}
             <button className="secondary-button" onClick={() => setAssessing(true)}>{profile ? "重新测试" : "开始测试"}</button>
           </div>
@@ -78,11 +78,11 @@ export function ProfileDetailScreen({ section }: { section: string }) {
             <div className="word-history">
               {lookedUpWords.map((word) => (
                 <div className="word-history-row" key={word.normalizedWord}>
-                  <strong>{word.word}</strong><span>点击 {word.lookupCount} 次</span>
+                  <strong>{word.word}</strong><span>查词 {word.lookupCount} 次</span>
                 </div>
               ))}
             </div>
-          ) : <p className="profile-empty">阅读时点击的单词会出现在这里。</p>}
+          ) : <p className="profile-empty">暂无查词记录</p>}
         </section>
       )}
 
@@ -97,15 +97,15 @@ export function ProfileDetailScreen({ section }: { section: string }) {
                 </a>
               ))}
             </div>
-          ) : <p className="profile-empty">读过的文章会保存在这里。</p>}
+          ) : <p className="profile-empty">暂无阅读记录</p>}
         </section>
       )}
 
       {section === "settings" && (
         <section className="profile-section profile-detail-section profile-stage">
           <div className="settings-group">
-            <button className="setting-row" onClick={() => setShowComposer(true)}><span>添加自己的文章</span><span>＋</span></button>
-            <div className="setting-row static"><span>数据存储</span><span>仅本机</span></div>
+            <button className="setting-row" onClick={() => setShowComposer(true)}><span>添加文章</span><span>＋</span></button>
+            <div className="setting-row static"><span>数据存储</span><span>当前设备</span></div>
           </div>
         </section>
       )}
@@ -122,7 +122,7 @@ export function ProfileDetailScreen({ section }: { section: string }) {
         </section>
       )}
 
-      {!VALID_SECTIONS.has(section) && <p className="profile-empty">这个页面不存在。</p>}
+      {!VALID_SECTIONS.has(section) && <p className="profile-empty">页面不存在</p>}
 
       <ArticleComposer open={showComposer} onClose={() => setShowComposer(false)} />
       <BottomNav active="me" />
@@ -140,7 +140,7 @@ function sortLookedUpWords(words: WordState[]) {
 
 function sectionTitle(section: string) {
   return {
-    vocabulary: "词汇量评级",
+    vocabulary: "阅读词汇水平",
     words: "点过的词",
     articles: "阅读的文章",
     preferences: "阅读偏好",

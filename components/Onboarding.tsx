@@ -55,12 +55,10 @@ export function Onboarding({ allowContinue, onComplete, onContinue }: Onboarding
           <span className="brand"><span className="brand-mark">J</span><span>Just Read</span></span>
         </header>
         <section className="welcome-card">
-          <p className="eyebrow">A BETTER START</p>
-          <h1>先找到你读起来<br />舒服的位置。</h1>
-          <p>看一小组英文单词，凭第一感觉选择认识、不确定或不认识。不是考试，也不会给你一个夸张的“准确词汇量”。</p>
+          <h1>确定阅读难度</h1>
           <div className="welcome-actions">
-            <button className="primary-button" onClick={() => setStarted(true)}>开始，大约 2 分钟 <span>→</span></button>
-            {allowContinue && <button className="quiet-button" onClick={onContinue}>先继续阅读已有文章</button>}
+            <button className="primary-button" onClick={() => setStarted(true)}>开始测试 <span>→</span></button>
+            {allowContinue && <button className="quiet-button" onClick={onContinue}>继续阅读</button>}
           </div>
         </section>
       </main>
@@ -80,18 +78,17 @@ export function Onboarding({ allowContinue, onComplete, onContinue }: Onboarding
         <div className="assessment-options">
           {ANSWER_OPTIONS.map((option) => (
             <button key={option.value} onClick={() => void answer(option.value)} disabled={saving}>
-              <strong>{option.label}</strong><span>{option.hint}</span>
+              <strong>{option.label}</strong>
             </button>
           ))}
         </div>
-        <p className="assessment-hint">不要猜太久，按第一感觉就好。</p>
       </section>
     </main>
   );
 }
 
-const ANSWER_OPTIONS: Array<{ value: AssessmentAnswer; label: string; hint: string }> = [
-  { value: "known", label: "认识", hint: "我知道它的大概意思" },
-  { value: "unsure", label: "不确定", hint: "眼熟，但说不准" },
-  { value: "unknown", label: "不认识", hint: "没关系，继续就好" },
+const ANSWER_OPTIONS: Array<{ value: AssessmentAnswer; label: string }> = [
+  { value: "known", label: "认识" },
+  { value: "unsure", label: "不确定" },
+  { value: "unknown", label: "不认识" },
 ];

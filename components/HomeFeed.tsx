@@ -57,7 +57,7 @@ export function HomeFeed() {
       }
 
       const ranked = rankColdStartCandidates(candidates, profile, new Date(), interestProfile, contentPreferences);
-      let lastError = "暂时没有可读的新文章";
+      let lastError = "没有可读的新文章";
       for (const [index, item] of ranked.entries()) {
         try {
           const article = await prepareCandidateArticle(item.candidate);
@@ -85,7 +85,7 @@ export function HomeFeed() {
       setFailed(true);
       setOpening(false);
     } catch {
-      setMessage("暂时无法准备文章，请稍后重试");
+      setMessage("文章加载失败");
       setFailed(true);
       setOpening(false);
     }
@@ -104,7 +104,7 @@ export function HomeFeed() {
           onClick={() => void openNextArticle()}
           disabled={opening}
         >
-          {opening ? "正在准备…" : failed ? "再试一次" : "开始阅读"}
+          {opening ? "正在加载…" : failed ? "重试" : "开始阅读"}
         </button>
         {message && <p className="reading-start-message" role="alert">{message}</p>}
       </section>

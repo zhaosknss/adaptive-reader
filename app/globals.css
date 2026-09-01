@@ -309,10 +309,8 @@ button, a { touch-action: manipulation; -webkit-tap-highlight-color: transparent
 .assessment-options button:hover, .assessment-options button:focus-visible { border-color: var(--accent); outline: none; }
 .assessment-options button:active { transform: translateY(1px); }
 .assessment-options button:disabled { opacity: .55; cursor: wait; }
-.assessment-options strong, .assessment-options span { display: block; }
+.assessment-options strong { display: block; }
 .assessment-options strong { font-size: 15px; }
-.assessment-options span { margin-top: 6px; color: var(--muted); font-size: 11px; line-height: 1.35; }
-.assessment-hint { margin: 20px 0 0; color: var(--muted); font-size: 11px; }
 
 .modal-layer { position: fixed; z-index: 50; inset: 0; display: grid; place-items: center; padding: 18px; overflow-y: auto; }
 .modal-dismiss { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; background: var(--overlay); cursor: default; backdrop-filter: blur(7px); }
@@ -436,8 +434,7 @@ button, a { touch-action: manipulation; -webkit-tap-highlight-color: transparent
   .assessment-card { padding: 38px 0 42px; }
   .assessment-card h1 { font-size: clamp(46px, 14vw, 68px); }
   .assessment-options { grid-template-columns: 1fr; gap: 9px; margin-top: 42px; }
-  .assessment-options button { display: grid; grid-template-columns: 88px 1fr; min-height: 60px; align-items: center; padding: 10px 16px; text-align: left; }
-  .assessment-options span { margin-top: 0; }
+  .assessment-options button { min-height: 60px; padding: 10px 16px; text-align: center; }
 }
 
 @media (prefers-reduced-motion: reduce) {

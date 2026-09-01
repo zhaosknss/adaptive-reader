@@ -5,8 +5,8 @@ import { THEME_INITIALIZER_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Just Read · 自适应英文阅读",
-  description: "一个会逐渐了解你的兴趣和阅读难度的英文文章流。",
+  title: "Just Read · 英文阅读",
+  description: "按兴趣和阅读难度推荐真实英文文章。",
   manifest: "/manifest.webmanifest",
   themeColor: "#F8F9FA",
   icons: {

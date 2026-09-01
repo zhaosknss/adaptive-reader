@@ -59,9 +59,8 @@ export function ArticleComposer({ open, onClose }: { open: boolean; onClose: () 
       <button className="modal-dismiss" onClick={onClose} aria-label="关闭添加文章弹层" />
       <section className="composer" role="dialog" aria-modal="true" aria-labelledby="composer-title">
         <button className="close-button" onClick={onClose} aria-label="关闭">×</button>
-        <p className="eyebrow">ADD CONTENT</p>
         <h2 id="composer-title">添加英文文章</h2>
-        <p className="composer-hint">从公开网址提取正文，或者直接粘贴。内容和阅读记录只保存在这台设备上。</p>
+        <p className="composer-hint">导入网页，或粘贴英文正文。</p>
         <form className="url-import" onSubmit={(event) => void importFromUrl(event)}>
           <label>文章网址<input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://example.com/article" inputMode="url" /></label>
           {urlError && <p className="form-error" role="alert">{urlError}</p>}
@@ -69,16 +68,16 @@ export function ArticleComposer({ open, onClose }: { open: boolean; onClose: () 
             {importing ? "正在提取正文…" : "从网址导入"}
           </button>
         </form>
-        <div className="composer-divider"><span>或者直接粘贴</span></div>
+        <div className="composer-divider"><span>或粘贴正文</span></div>
         <form onSubmit={(event) => void save(event)}>
           <label>标题<input ref={titleRef} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="The title of the article" /></label>
           <label>正文<textarea value={content} onChange={(event) => setContent(event.target.value)} placeholder={SAMPLE_PLACEHOLDER} /></label>
           {error && <p className="form-error" role="alert">{error}</p>}
-          <button className="primary-button full-width" type="submit">保存并开始阅读 <span>→</span></button>
+          <button className="primary-button full-width" type="submit">保存并阅读 <span>→</span></button>
         </form>
       </section>
     </div>
   );
 }
 
-const SAMPLE_PLACEHOLDER = "Paste the English article here.\n\nKeep the original paragraphs. Punctuation and spacing will stay exactly where they belong.";
+const SAMPLE_PLACEHOLDER = "Paste the English article here.";

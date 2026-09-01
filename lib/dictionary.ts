@@ -6,6 +6,8 @@ export interface DictionaryProvider {
   lookup(word: string): Promise<DictionaryResult>;
 }
 
+export const NO_CHINESE_DEFINITION = "未收录释义";
+
 const FALLBACK: Record<string, string> = {
   the: "这；那；这个", be: "是；成为", have: "有；拥有", make: "制作；使得",
   read: "阅读", article: "文章", world: "世界", people: "人们", different: "不同的",
@@ -118,7 +120,7 @@ class FreeDictionaryProvider implements DictionaryProvider {
 
     const result: DictionaryResult = {
       word,
-      translation: translation.status === "fulfilled" ? translation.value : (FALLBACK[word] ?? "暂无中文释义"),
+      translation: translation.status === "fulfilled" ? translation.value : (FALLBACK[word] ?? NO_CHINESE_DEFINITION),
       definition: dictionary.status === "fulfilled" ? dictionary.value.definition : undefined,
       phonetic: dictionary.status === "fulfilled" ? dictionary.value.phonetic : undefined,
       source: translation.status === "fulfilled" || dictionary.status === "fulfilled" ? "remote" : "fallback",
@@ -192,7 +194,7 @@ function removeDoubledEnding(value: string) {
 function isUsefulTranslation(value?: string): value is string {
   return Boolean(
     value
-    && value !== "暂无中文释义"
+    && value !== NO_CHINESE_DEFINITION
     && !value.toUpperCase().startsWith("MYMEMORY WARNING"),
   );
 }
