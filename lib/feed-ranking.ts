@@ -3,10 +3,11 @@ import { getBuiltinReading } from "./builtin-readings.ts";
 import { combineInterestWithPreferences, contentPreferenceScore } from "./content-preferences.ts";
 import { frequencyProvider } from "./frequency.ts";
 import { explorationScoreForCandidate, interestScoreForCandidate } from "./interest-profile.ts";
+import { COMFORTABLE_WORDS_BY_BAND, TARGET_DIFFICULTY_BY_BAND, normalizeReadingComfortProfile } from "./reading-comfort.ts";
 import { readingMinutes, tokenizePreservingText } from "./text.ts";
-import type { CandidateArticle, ContentPreferences, InterestProfile, RankingComponents, RankingWeights, RecommendationCandidateSnapshot, VocabularyProfile } from "./types.ts";
+import type { CandidateArticle, ContentPreferences, InterestProfile, RankingComponents, RankingWeights, ReadingComfortProfile, RecommendationCandidateSnapshot, VocabularyProfile } from "./types.ts";
 
-export const RANKING_MODEL_VERSION = 4;
+export const RANKING_MODEL_VERSION = 5;
 export const RANKING_WEIGHTS: RankingWeights = {
   interest: 0.32,
   readability: 0.42,
@@ -15,9 +16,6 @@ export const RANKING_WEIGHTS: RankingWeights = {
   baseScore: 0.9,
   diversity: 0.1,
 };
-
-const TARGET_DIFFICULTY_BY_BAND = [0.12, 0.18, 0.24, 0.3, 0.36, 0.42] as const;
-const COMFORTABLE_WORDS_BY_BAND = [90, 180, 320, 520, 800, 1200] as const;
 
 export type RankedCandidate = {
   candidate: CandidateArticle;
@@ -33,6 +31,9 @@ export type RankedCandidate = {
   difficultyScore: number;
   vocabularyBand: number;
   targetDifficulty: number;
+  comfortableWords: number;
+  difficultyTolerance: number;
+  successPhase: boolean;
   estimatedMinutes: number;
 };
 
@@ -42,10 +43,11 @@ export function rankColdStartCandidates(
   now = new Date(),
   interestProfile?: InterestProfile | null,
   contentPreferences?: ContentPreferences | null,
+  readingComfort?: ReadingComfortProfile | null,
 ): RankedCandidate[] {
   const available = candidates
     .filter((candidate) => candidate.status === "available" && candidate.url)
-    .map((candidate) => scoreCandidate(candidate, profile, interestProfile, contentPreferences, now));
+    .map((candidate) => scoreCandidate(candidate, profile, interestProfile, contentPreferences, readingComfort, now));
   const ranked: RankedCandidate[] = [];
   const sourceCounts = new Map<string, number>();
   const topicCounts = new Map<string, number>();
@@ -87,10 +89,11 @@ function scoreCandidate(
   profile: VocabularyProfile | null | undefined,
   interestProfile: InterestProfile | null | undefined,
   contentPreferences: ContentPreferences | null | undefined,
+  readingComfort: ReadingComfortProfile | null | undefined,
   now: Date,
 ) {
   const builtin = getBuiltinReading(candidate.contentId);
-  const sample = builtin?.content ?? `${candidate.title}. ${candidate.summary}`;
+  const sample = candidate.contentSnapshot ?? builtin?.content ?? `${candidate.title}. ${candidate.summary}`;
   const difficulty = estimateDifficulty(sample, [], frequencyProvider, profile);
   const learnedInterest = interestScoreForCandidate(candidate, interestProfile);
   const preferenceScore = contentPreferenceScore(candidate, contentPreferences);
@@ -101,13 +104,17 @@ function scoreCandidate(
     contentPreferences,
   );
   const band = profileBand(profile);
-  const targetDifficulty = TARGET_DIFFICULTY_BY_BAND[band];
-  const difficultyFit = clamp01(1 - Math.abs(difficulty.score - targetDifficulty) / 0.42);
+  const comfort = normalizeReadingComfortProfile(readingComfort, profile);
+  const targetDifficulty = comfort.targetDifficulty ?? TARGET_DIFFICULTY_BY_BAND[band];
+  const difficultyDistance = comfort.successPhase
+    ? Math.max(0, difficulty.score - targetDifficulty)
+    : Math.abs(difficulty.score - targetDifficulty);
+  const difficultyFit = clamp01(1 - difficultyDistance / 0.42);
   const levelFit = typeof candidate.readingLevel === "number"
     ? clamp01(1 - Math.abs(candidate.readingLevel - band) / 3)
     : difficultyFit;
   const wordCount = tokenizePreservingText(sample).filter((token) => token.type === "word").length;
-  const comfortableWords = COMFORTABLE_WORDS_BY_BAND[band];
+  const comfortableWords = comfort.comfortableWords ?? COMFORTABLE_WORDS_BY_BAND[band];
   const lengthFit = wordCount <= comfortableWords
     ? 1
     : clamp01(1 - (wordCount - comfortableWords) / (comfortableWords * 2));
@@ -140,6 +147,9 @@ function scoreCandidate(
     difficultyScore: round(difficulty.score),
     vocabularyBand: band,
     targetDifficulty,
+    comfortableWords,
+    difficultyTolerance: comfort.difficultyTolerance,
+    successPhase: comfort.successPhase,
     estimatedMinutes: Math.max(1, Math.min(12, readingMinutes(sample))),
   } satisfies RankedCandidate;
 }
@@ -149,13 +159,16 @@ export function recommendationSlate(
   selectedCandidateId: string,
   selectedArticleId: string,
   limit = 15,
+  selectedFullDifficulty?: number,
 ): RecommendationCandidateSnapshot[] {
   return ranked.slice(0, Math.max(1, limit)).map((item, index) => ({
     candidateId: item.candidate.id,
     articleId: item.candidate.id === selectedCandidateId ? selectedArticleId : item.candidate.articleId,
     rank: index + 1,
     totalScore: item.score,
-    difficultyScore: item.difficultyScore,
+    difficultyScore: item.candidate.id === selectedCandidateId && selectedFullDifficulty !== undefined
+      ? round(selectedFullDifficulty)
+      : item.difficultyScore,
     interestScore: item.interestScore,
     explorationScore: item.explorationScore,
   }));

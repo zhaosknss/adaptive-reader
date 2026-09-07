@@ -2,6 +2,8 @@
 
 一个本地优先、手机优先的自适应英文阅读器。
 
+项目完全开源：自有源代码采用 [MIT License](LICENSE)。内置词典、词表和阅读材料保留各自的许可证、署名与公版边界，详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 和 [内容来源说明](docs/CONTENT_SOURCES.md)。
+
 > Don't study English. Just read English.
 >
 > A feed that learns both what you like and what you can understand.
@@ -23,10 +25,12 @@
 9. 刷新页面或重启本地服务后，文章和阅读状态仍然存在。
 10. 首次打开会进行 20～25 词的轻量自适应判断，并保存一条 `VocabularyProfile`。
 11. 新遇到单词时会结合本地词频与 VocabularyPrior 初始化 familiarity；真实阅读行为随后逐渐覆盖先验。
-12. 底部只有“阅读 / 我的”；“我的”先显示词汇量评级、点过的词、阅读的文章和设置四个一级入口，再进入仍属于“我的”的对应页面。
-13. “我的 → 设置”支持跟随系统/白天/黑夜，以及深海蓝、青绿色、紫灰色和炭黑色主题；偏好仅保存在当前设备。
-14. 内容池同时包含实时 RSS 文章与随应用提供的公版文学短篇，当前覆盖诗歌、寓言、童话、短篇故事、希腊神话和文学散文。
-15. “我的 → 设置 → 阅读偏好”可选择一个“最想读”、多个“也感兴趣”，或保持“先都看看”；它只提供冷启动倾向，不会过滤其他类型，真实阅读行为会逐渐取得更高权重。
+12. 底部只有“阅读 / 我的”；“我的”提供词汇量评级、点过的词、阅读的文章、阅读偏好、外观和设置六个一级入口。
+13. “我的 → 外观”支持跟随系统/白天/黑夜，以及深海蓝、青绿色、紫灰色和炭黑色主题；偏好仅保存在当前设备。
+14. 内容分为 Success / Bridge / Open Web 三层：低等级先读短而清楚的授权原文，顺畅后再逐渐接近普通百科、新闻档案和实时网页。
+15. 内置 65 条逐页核对的 Simple English Wikipedia 原文导语快照；在线 API 不通时仍可连续阅读。每条都保存原页面、许可、署名和节选/清理标记。
+16. 公版文学池覆盖诗歌、寓言、童话、短篇故事、希腊神话和文学散文；普通 RSS 保留在 Open Web 层。
+17. “我的 → 阅读偏好”可选择一个“最想读”和多个“也感兴趣”；它只提供冷启动倾向，不会过滤其他类型，真实阅读行为会逐渐取得更高权重。
 
 当前 ranking 显式组合 interest、readability、freshness、exploration 和 diversity。可读性目标会随 `VocabularyProfile.estimatedBand` 调整；低等级优先完整但更短、句词更简单的内容，而不是把同一难度文章统一标成“简单”。显式阅读偏好只作为早期先验；产生新的真实阅读行为后，独立的 `InterestProfile` 会根据来源、主题和少量关键词温和调整排序，且行为证据越多，手动偏好的影响越低。它只是一套本地、可解释的偏好估计，不声称准确判断兴趣。
 
@@ -72,7 +76,7 @@ pnpm build
 - `interestProfile`：保存来源、主题和关键词的轻量偏好；读完/跳过会结合阅读时长、查词率和难度反馈更新，同一次推荐只处理一次。
 - `contentPreferences`：保存“先都看看”或主/次内容偏好，只作为推荐冷启动先验，不作为内容过滤器。
 - `vocabularyProfile`：只保存当前用户的一条冷启动词汇先验，不为测评题目批量创建 `WordState`。
-- `candidates`：RSS/Atom 发现的轻量候选元数据，或带 `contentId`、`readingLevel` 的内置文学候选；系统选中下一篇后才准备正文，并通过持久 `articleId` 连接到 `Article`。
+- `candidates`：保存 pool、适用 band、内容出处和可选正文快照；普通 RSS 仍只保存轻量元数据。系统选中下一篇后才创建 Article，并通过持久 `articleId` 连接。
 
 `familiarity` 只是一个简单、可解释的熟悉概率估计，不代表用户真正“掌握”了某个词。新文章中的重复曝光会轻微提高它，查询会降低它。
 
@@ -99,6 +103,8 @@ Reader 只依赖统一的 `DictionaryProvider` 接口。当前随应用提供 58
 - `components/Reader.tsx` — 阅读、点词、释义层、跳过与读完
 - `lib/assessment.ts`、`lib/assessment-items.ts` — 纯 TypeScript 测评状态机与小型分档词库
 - `lib/content-sources.ts`、`lib/feed.ts`、`lib/feed-ranking.ts` — 固定来源、RSS/Atom 解析和按词汇等级适配的可解释排序
+- `lib/content-pools.ts`、`lib/reusable-content-sources.ts` — Success / Bridge / Open Web 阶段门控、Wikimedia 在线发现和离线回退
+- `lib/simple-wiki-snapshots-a.ts`、`lib/simple-wiki-snapshots-b.ts` — 已核对的 CC BY-SA 原文导语快照
 - `lib/builtin-readings.ts`、`docs/CONTENT_SOURCES.md` — 公版文学正文、体裁/等级元数据与来源记录
 - `lib/interest-profile.ts` — 独立兴趣模型、反馈降噪和候选兴趣/探索分量
 - `lib/candidate-import.ts` — 候选正文准备、URL 去重和 Candidate/Article 归因
@@ -115,14 +121,18 @@ Reader 只依赖统一的 `DictionaryProvider` 接口。当前随应用提供 58
 - `app/api/extract/route.ts` — 带超时和错误处理的薄 URL 抓取接口
 - `tests/` — 文本、曝光、归因、阅读入口、熟悉度、难度、Feed 和正文提取测试
 
-## 开源组件与许可证状态
+## 开源许可证
+
+Adaptive Reader 自有源代码采用 MIT License，允许使用、修改和再发布，但必须保留版权和许可声明。内容与数据不自动归入 MIT：
 
 - React、Vite/Vinext、TypeScript、ESLint：按各自上游许可证使用。
 - `wordlist-english`（MIT）及其 SCOWL 词表：当前只使用频率等级 10 和 20；保留 SCOWL 上游版权与许可要求。
 - Mozilla Readability（Apache-2.0）与 LinkeDOM（ISC）：用于服务端正文提取。
 - ECDICT（MIT）：生成 58,226 条核心词和 330,741 条扩展词的按需加载本地英汉词典分片，保留上游许可证。
 - 当前未复制 Lute 或 LinguaCafe 的代码。
-- 项目自身的开源许可证尚未确定。在确定许可证和词典/词频数据来源前，不宣称当前仓库已经可公开分发。
+- Simple English Wikipedia、Wikinews 与 Project Gutenberg 阅读材料继续遵守各自的署名、相同方式共享或公版地域边界。
+
+完整说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。欢迎提交 Issue 和 Pull Request；开发与内容贡献要求见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ## Roadmap
 
@@ -136,5 +146,6 @@ Reader 只依赖统一的 `DictionaryProvider` 接口。当前随应用提供 58
 6. Exploration、diversity 与 PWA
 7. 中性白视觉系统、日夜模式与多主题色
 8. 非强制的显式阅读偏好与行为优先的兴趣融合
+9. Success / Bridge / Open Web 内容分层、许可出处和低等级可持续内容池
 
-以上阶段已经完成。下一步以真实日常阅读反馈校准推荐权重，不继续堆叠页面。当前开发阶段、已验证基线和不可破坏的实现边界记录在 `docs/PROJECT_STATE.md`；内容来源边界见 `docs/CONTENT_SOURCES.md`。
+以上阶段已经完成。当前不再靠继续调 difficulty 权重解决低等级内容不足，而是让可复用内容仍经过同一全文门槛。当前开发阶段、已验证基线和不可破坏的实现边界记录在 `docs/PROJECT_STATE.md`；内容来源与许可边界见 `docs/CONTENT_SOURCES.md`。

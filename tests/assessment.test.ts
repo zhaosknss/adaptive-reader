@@ -88,3 +88,29 @@ test("vocabulary prior changes only the initial familiarity estimate", () => {
   );
   assert.equal(frequencyProvider.lookup("interdisciplinarity").band, "rare");
 });
+
+test("an all-unknown assessment gives band 0 a conservative common-word prior", () => {
+  let state = startAssessment();
+  while (!state.completed) state = submitAssessmentRound(state, unknown);
+  const profile = vocabularyProfileFromAssessment(state, "2026-09-02T00:00:00.000Z");
+
+  assert.equal(profile.estimatedBand, 0);
+  assert.equal(profile.confidence, 1);
+  assert.equal(frequencyProvider.lookup("journey").band, "common");
+  assert.ok(frequencyProvider.initialFamiliarity("journey", profile) < 0.5);
+  assert.ok(frequencyProvider.initialFamiliarity("book", profile) <= 0.55);
+});
+
+test("band 1 keeps common vocabulary below the known threshold", () => {
+  const profile = {
+    id: "current" as const,
+    estimatedBand: 1,
+    frequencyThreshold: 0.8,
+    confidence: 0.9,
+    assessedAt: "2026-09-02T00:00:00.000Z",
+    assessmentVersion: 1,
+  };
+
+  assert.ok(frequencyProvider.initialFamiliarity("journey", profile) < 0.5);
+  assert.ok(frequencyProvider.initialFamiliarity("book", profile) > frequencyProvider.initialFamiliarity("journey", profile));
+});

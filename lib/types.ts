@@ -29,7 +29,39 @@ export type VocabularyProfile = {
   assessmentVersion: number;
 };
 
+export type ReadingComfortProfile = {
+  id: "current";
+  vocabularyBand: number;
+  targetDifficulty: number;
+  comfortableWords: number;
+  difficultyTolerance: number;
+  successPhase: boolean;
+  successfulReadStreak: number;
+  hardReadStreak: number;
+  evidenceCount: number;
+  updatedAt: string | null;
+  modelVersion: number;
+};
+
 export type CandidateStatus = "available" | "dismissed" | "imported";
+export type ContentPool = "success" | "bridge" | "open_web";
+export type ContentType = "article" | "news" | "encyclopedia" | "poetry" | "story" | "essay" | "other";
+export type ContentTransformation = "excerpt" | "cleaned" | "modified";
+
+export type ContentProvenance = {
+  sourceId: string;
+  sourceName: string;
+  sourceUrl: string;
+  originalUrl: string;
+  license: string;
+  licenseUrl: string | null;
+  attribution: string;
+  author: string | null;
+  publishedAt: string | null;
+  retrievedAt: string;
+  contentType: ContentType;
+  transformations: ContentTransformation[];
+};
 
 export type ContentPreferenceKey =
   | "science_technology"
@@ -64,7 +96,12 @@ export type CandidateArticle = {
   status: CandidateStatus;
   articleId: string | null;
   contentId?: string | null;
+  contentSnapshot?: string | null;
+  pool: ContentPool;
+  successBandMin: number | null;
+  successBandMax: number | null;
   readingLevel?: number | null;
+  provenance: ContentProvenance | null;
 };
 
 export type ArticleAttribution = {
@@ -74,6 +111,7 @@ export type ArticleAttribution = {
   topic: string;
   author: string | null;
   publishedAt: string | null;
+  provenance: ContentProvenance | null;
 };
 
 export type ContentSourceDefinition = {
@@ -82,6 +120,7 @@ export type ContentSourceDefinition = {
   topic: string;
   feedUrl: string;
   siteUrl: string;
+  pool?: ContentPool;
 };
 
 export type Article = {
@@ -156,6 +195,9 @@ export type RecommendationEvent = {
   rankingWeights: RankingWeights;
   vocabularyBand: number;
   targetDifficulty: number;
+  comfortableWords: number;
+  difficultyTolerance: number;
+  successPhase: boolean;
   explorationType: "interest_novelty" | "legacy";
   outcome: RecommendationOutcome | null;
 };
@@ -175,9 +217,19 @@ export type RecommendationOutcome = {
   maxReadingProgress: number;
   lookupCount: number;
   exposedUniqueWordCount: number;
+  lookupFriction: LookupFrictionMetrics;
   difficultyFeedback: DifficultyFeedback | null;
   finished: boolean;
   recordedAt: string;
+};
+
+export type LookupFrictionMetrics = {
+  lookupsPer100ExposedWords: number;
+  maxLookupsInContext: number;
+  maxLookupDensityByContext: number;
+  highFrictionContextCount: number;
+  consecutiveHighFrictionContexts: number;
+  score: number;
 };
 
 export type ReadingEntryContext = {
@@ -209,6 +261,7 @@ export type ReadingOutcomeMetrics = {
   maxReadingProgress?: number;
   lookupCount: number;
   exposedUniqueWordCount?: number;
+  lookupFriction?: LookupFrictionMetrics;
   recommendationEventId?: string | null;
   candidateId?: string | null;
   entryPoint?: ReadingEntryPoint | null;

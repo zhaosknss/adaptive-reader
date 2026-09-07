@@ -1,12 +1,14 @@
-import type { Article, ArticleAttribution, CandidateArticle, CandidateStatus, ContentPreferences, DictionaryResult, DifficultyFeedback, InterestProfile, LexicalEvent, RankingComponents, RankingWeights, ReadingEntryContext, ReadingEvent, ReadingEventType, ReadingOutcomeMetrics, RecommendationCandidateSnapshot, RecommendationEvent, RecommendationOutcome, VocabularyProfile, WordState } from "./types.ts";
-import { normalizeWord } from "./text.ts";
+import type { Article, ArticleAttribution, CandidateArticle, CandidateStatus, ContentPool, ContentPreferences, ContentProvenance, ContentTransformation, ContentType, DictionaryResult, DifficultyFeedback, InterestProfile, LexicalEvent, RankingComponents, RankingWeights, ReadingComfortProfile, ReadingEntryContext, ReadingEvent, ReadingEventType, ReadingOutcomeMetrics, RecommendationCandidateSnapshot, RecommendationEvent, RecommendationOutcome, VocabularyProfile, WordState } from "./types.ts";
+import { normalizeWord, tokenizePreservingText } from "./text.ts";
 import { aggregateLexicalEvent } from "./familiarity.ts";
 import { frequencyProvider } from "./frequency.ts";
 import { applyInterestFeedback, emptyInterestProfile, extractCandidateKeywords, normalizeInterestProfile } from "./interest-profile.ts";
 import { emptyContentPreferences, normalizeContentPreferences } from "./content-preferences.ts";
+import { normalizeLookupFriction } from "./lookup-friction.ts";
+import { applyReadingOutcomeToComfort, initialReadingComfortProfile, normalizeReadingComfortProfile } from "./reading-comfort.ts";
 
 const DB_NAME = "just-read";
-const DB_VERSION = 9;
+const DB_VERSION = 10;
 const ARTICLES = "articles";
 const WORDS = "words";
 const DICTIONARY = "dictionary";
@@ -18,6 +20,7 @@ const RECOMMENDATION_EVENTS = "recommendationEvents";
 const INTEREST_PROFILE = "interestProfile";
 const CONTENT_PREFERENCES = "contentPreferences";
 const LEXICAL_EVENTS = "lexicalEvents";
+const READING_COMFORT_PROFILE = "readingComfortProfile";
 const LOOKUP_EVIDENCE_WINDOW_MS = 30_000;
 
 type WordExposure = {
@@ -99,6 +102,10 @@ function openDatabase(): Promise<IDBDatabase> {
         store.createIndex("articleId", "articleId");
         store.createIndex("normalizedWord", "normalizedWord");
         store.createIndex("timestamp", "timestamp");
+      }
+
+      if (!db.objectStoreNames.contains(READING_COMFORT_PROFILE)) {
+        db.createObjectStore(READING_COMFORT_PROFILE, { keyPath: "id" });
       }
     };
   });
@@ -191,6 +198,21 @@ export async function saveVocabularyProfile(profile: VocabularyProfile): Promise
   db.close();
 }
 
+export async function getReadingComfortProfile(): Promise<ReadingComfortProfile> {
+  const db = await openDatabase();
+  const transaction = db.transaction([READING_COMFORT_PROFILE, VOCABULARY_PROFILE], "readonly");
+  const [value, vocabularyValue] = await Promise.all([
+    requestResult(transaction.objectStore(READING_COMFORT_PROFILE).get("current")) as Promise<Partial<ReadingComfortProfile> | undefined>,
+    requestResult(transaction.objectStore(VOCABULARY_PROFILE).get("current")) as Promise<Partial<VocabularyProfile> | undefined>,
+  ]);
+  await transactionDone(transaction);
+  db.close();
+  const vocabularyProfile = vocabularyValue ? normalizeVocabularyProfile(vocabularyValue) : undefined;
+  return value
+    ? normalizeReadingComfortProfile(value, vocabularyProfile)
+    : initialReadingComfortProfile(vocabularyProfile);
+}
+
 export async function getInterestProfile(): Promise<InterestProfile> {
   const db = await openDatabase();
   const transaction = db.transaction(INTEREST_PROFILE, "readonly");
@@ -277,6 +299,9 @@ export async function recordRecommendationSelection(input: {
   rankingWeights?: RankingWeights;
   vocabularyBand?: number;
   targetDifficulty?: number;
+  comfortableWords?: number;
+  difficultyTolerance?: number;
+  successPhase?: boolean;
 }): Promise<RecommendationEvent> {
   const candidateSlate = normalizeCandidateSlate(input.candidateSlate);
   const event: RecommendationEvent = {
@@ -309,6 +334,9 @@ export async function recordRecommendationSelection(input: {
     rankingWeights: normalizeRankingWeights(input.rankingWeights),
     vocabularyBand: normalizeVocabularyBand(input.vocabularyBand),
     targetDifficulty: clamp01(input.targetDifficulty ?? 0.24),
+    comfortableWords: Math.max(60, Math.round(input.comfortableWords ?? 320)),
+    difficultyTolerance: clamp(input.difficultyTolerance ?? 0.2, 0.08, 0.35),
+    successPhase: input.successPhase === true,
     explorationType: "interest_novelty",
     outcome: null,
   };
@@ -610,15 +638,24 @@ export async function saveArticleDifficulty(id: string, estimatedDifficulty: num
 
 async function updateArticleStatus(id: string, status: "finished" | "skipped", metrics: ReadingOutcomeMetrics) {
   const db = await openDatabase();
-  const transaction = db.transaction([ARTICLES, EVENTS, RECOMMENDATION_EVENTS, INTEREST_PROFILE], "readwrite");
+  const transaction = db.transaction([
+    ARTICLES,
+    EVENTS,
+    RECOMMENDATION_EVENTS,
+    INTEREST_PROFILE,
+    READING_COMFORT_PROFILE,
+    VOCABULARY_PROFILE,
+  ], "readwrite");
   const store = transaction.objectStore(ARTICLES);
   const recommendationStore = transaction.objectStore(RECOMMENDATION_EVENTS);
-  const [value, recommendationValue, profileValue] = await Promise.all([
+  const [value, recommendationValue, profileValue, comfortValue, vocabularyValue] = await Promise.all([
     requestResult(store.get(id)) as Promise<Partial<Article> | undefined>,
     metrics.recommendationEventId
       ? requestResult(recommendationStore.get(metrics.recommendationEventId)) as Promise<Partial<RecommendationEvent> | undefined>
       : Promise.resolve(undefined),
     requestResult(transaction.objectStore(INTEREST_PROFILE).get("current")) as Promise<Partial<InterestProfile> | undefined>,
+    requestResult(transaction.objectStore(READING_COMFORT_PROFILE).get("current")) as Promise<Partial<ReadingComfortProfile> | undefined>,
+    requestResult(transaction.objectStore(VOCABULARY_PROFILE).get("current")) as Promise<Partial<VocabularyProfile> | undefined>,
   ]);
   if (!value) {
     transaction.abort();
@@ -640,6 +677,12 @@ async function updateArticleStatus(id: string, status: "finished" | "skipped", m
     maxReadingProgress: metrics.maxReadingProgress ?? 0,
     lookupCount: metrics.lookupCount,
     exposedUniqueWordCount: metrics.exposedUniqueWordCount ?? 0,
+    lookupsPer100ExposedWords: metrics.lookupFriction?.lookupsPer100ExposedWords ?? 0,
+    maxLookupsInContext: metrics.lookupFriction?.maxLookupsInContext ?? 0,
+    maxLookupDensityByContext: metrics.lookupFriction?.maxLookupDensityByContext ?? 0,
+    highFrictionContextCount: metrics.lookupFriction?.highFrictionContextCount ?? 0,
+    consecutiveHighFrictionContexts: metrics.lookupFriction?.consecutiveHighFrictionContexts ?? 0,
+    lookupFrictionScore: metrics.lookupFriction?.score ?? 0,
     difficultyFeedback: updated.userDifficultyFeedback,
     finished: status === "finished",
   }, {
@@ -653,6 +696,7 @@ async function updateArticleStatus(id: string, status: "finished" | "skipped", m
       maxReadingProgress: metrics.maxReadingProgress ?? (status === "finished" ? 1 : 0),
       lookupCount: metrics.lookupCount,
       exposedUniqueWordCount: metrics.exposedUniqueWordCount ?? 0,
+      lookupFriction: normalizeLookupFriction(metrics.lookupFriction),
       difficultyFeedback: updated.userDifficultyFeedback,
       finished: status === "finished",
       recordedAt: new Date().toISOString(),
@@ -665,7 +709,20 @@ async function updateArticleStatus(id: string, status: "finished" | "skipped", m
         article: updated,
         recommendation: validRecommendation,
         readingTimeSeconds: metrics.readingTimeSeconds,
+        activeReadingSeconds: metrics.activeReadingSeconds,
+        maxReadingProgress: metrics.maxReadingProgress,
         lookupCount: metrics.lookupCount,
+        lookupFriction: outcome.lookupFriction,
+      },
+    ));
+    const vocabularyProfile = vocabularyValue ? normalizeVocabularyProfile(vocabularyValue) : undefined;
+    transaction.objectStore(READING_COMFORT_PROFILE).put(applyReadingOutcomeToComfort(
+      comfortValue ? normalizeReadingComfortProfile(comfortValue, vocabularyProfile) : initialReadingComfortProfile(vocabularyProfile),
+      vocabularyProfile,
+      {
+        outcome,
+        articleDifficulty: updated.estimatedDifficulty ?? validRecommendation.targetDifficulty,
+        articleWordCount: countArticleWords(updated.content),
       },
     ));
   }
@@ -771,9 +828,14 @@ function normalizeCandidate(value: Partial<CandidateArticle>): CandidateArticle 
     status,
     articleId: value.articleId ?? null,
     contentId: value.contentId?.trim() || null,
+    contentSnapshot: value.contentSnapshot?.trim() || null,
+    pool: normalizeContentPool(value.pool, value.sourceId, value.readingLevel),
+    successBandMin: normalizeOptionalBand(value.successBandMin),
+    successBandMax: normalizeOptionalBand(value.successBandMax),
     readingLevel: typeof value.readingLevel === "number"
       ? Math.min(5, Math.max(0, Math.round(value.readingLevel)))
       : null,
+    provenance: normalizeProvenance(value.provenance),
   };
 }
 
@@ -785,6 +847,7 @@ function attributionFromCandidate(candidate: CandidateArticle): ArticleAttributi
     topic: candidate.topic,
     author: candidate.author,
     publishedAt: candidate.publishedAt,
+    provenance: candidate.provenance,
   };
 }
 
@@ -797,6 +860,45 @@ function normalizeAttribution(value: Partial<ArticleAttribution> | null | undefi
     topic: value.topic?.trim() || "General",
     author: value.author?.trim() || null,
     publishedAt: value.publishedAt ?? null,
+    provenance: normalizeProvenance(value.provenance),
+  };
+}
+
+function normalizeContentPool(value: ContentPool | undefined, sourceId?: string, readingLevel?: number | null): ContentPool {
+  if (value === "success" || value === "bridge" || value === "open_web") return value;
+  if (sourceId?.startsWith("library:")) {
+    if (typeof readingLevel === "number" && readingLevel <= 1) return "success";
+    if (typeof readingLevel === "number" && readingLevel <= 3) return "bridge";
+  }
+  return "open_web";
+}
+
+function normalizeOptionalBand(value: number | null | undefined) {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.min(5, Math.max(0, Math.round(value)))
+    : null;
+}
+
+function normalizeProvenance(value: Partial<ContentProvenance> | null | undefined): ContentProvenance | null {
+  if (!value?.sourceId || !value.originalUrl || !value.license || !value.attribution) return null;
+  const originalUrl = canonicalizeSourceUrl(value.originalUrl);
+  const sourceUrl = canonicalizeSourceUrl(value.sourceUrl);
+  if (!originalUrl || !sourceUrl) return null;
+  const validContentTypes: ContentType[] = ["article", "news", "encyclopedia", "poetry", "story", "essay", "other"];
+  const validTransformations: ContentTransformation[] = ["excerpt", "cleaned", "modified"];
+  return {
+    sourceId: value.sourceId,
+    sourceName: value.sourceName?.trim() || "Unknown source",
+    sourceUrl,
+    originalUrl,
+    license: value.license.trim(),
+    licenseUrl: canonicalizeSourceUrl(value.licenseUrl),
+    attribution: value.attribution.trim(),
+    author: value.author?.trim() || null,
+    publishedAt: value.publishedAt ?? null,
+    retrievedAt: value.retrievedAt ?? new Date().toISOString(),
+    contentType: validContentTypes.includes(value.contentType as ContentType) ? value.contentType as ContentType : "other",
+    transformations: [...new Set((value.transformations ?? []).filter((item): item is ContentTransformation => validTransformations.includes(item as ContentTransformation)))],
   };
 }
 
@@ -836,6 +938,9 @@ function normalizeRecommendationEvent(value: Partial<RecommendationEvent>): Reco
     rankingWeights: normalizeRankingWeights(value.rankingWeights),
     vocabularyBand: normalizeVocabularyBand(value.vocabularyBand),
     targetDifficulty: clamp01(value.targetDifficulty ?? 0.24),
+    comfortableWords: Math.max(60, Math.round(value.comfortableWords ?? 320)),
+    difficultyTolerance: clamp(value.difficultyTolerance ?? 0.2, 0.08, 0.35),
+    successPhase: value.successPhase === true,
     explorationType: value.explorationType === "interest_novelty" ? "interest_novelty" : "legacy",
     outcome: value.outcome ? normalizeRecommendationOutcome(value.outcome) : null,
   };
@@ -870,6 +975,7 @@ function normalizeRecommendationOutcome(value: Partial<RecommendationOutcome>): 
     maxReadingProgress: clamp01(value.maxReadingProgress ?? 0),
     lookupCount: Math.max(0, Math.round(value.lookupCount ?? 0)),
     exposedUniqueWordCount: Math.max(0, Math.round(value.exposedUniqueWordCount ?? 0)),
+    lookupFriction: normalizeLookupFriction(value.lookupFriction),
     difficultyFeedback: value.difficultyFeedback === "too_easy" || value.difficultyFeedback === "suitable" || value.difficultyFeedback === "too_hard"
       ? value.difficultyFeedback
       : null,
@@ -939,6 +1045,7 @@ function normalizeOutcomeMetrics(value?: number | ReadingOutcomeMetrics): Readin
     maxReadingProgress: clamp01(value?.maxReadingProgress ?? 0),
     lookupCount: Math.max(0, Math.round(value?.lookupCount ?? 0)),
     exposedUniqueWordCount: Math.max(0, Math.round(value?.exposedUniqueWordCount ?? 0)),
+    lookupFriction: normalizeLookupFriction(value?.lookupFriction),
     recommendationEventId: value?.recommendationEventId ?? null,
     candidateId: value?.candidateId ?? null,
     entryPoint: normalizeEntryPoint(value?.entryPoint),
@@ -985,4 +1092,12 @@ function createLexicalEvent(value: Omit<LexicalEvent, "id">): LexicalEvent {
 
 function clamp01(value: number) {
   return Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
+}
+
+function clamp(value: number, minimum: number, maximum: number) {
+  return Math.min(maximum, Math.max(minimum, Number.isFinite(value) ? value : minimum));
+}
+
+function countArticleWords(content: string) {
+  return tokenizePreservingText(content).filter((token) => token.type === "word").length;
 }

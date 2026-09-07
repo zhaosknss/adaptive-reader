@@ -2,13 +2,16 @@
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from "react";
 /* eslint-disable @next/next/no-html-link-for-pages -- Vinext's production Link prefetch currently throws during setup. */
-import { prepareCandidateArticle } from "@/lib/candidate-import";
+import { selectCandidateByFullText } from "@/lib/article-selection";
 import { dictionaryProvider, NO_CHINESE_DEFINITION } from "@/lib/dictionary";
 import { compactDefinition } from "@/lib/definition-display";
+import { filterCandidatesForReadingStage } from "@/lib/content-pools";
 import { estimateDifficulty, type DifficultyEstimate } from "@/lib/difficulty";
 import { RANKING_WEIGHTS, rankColdStartCandidates, recommendationSlate } from "@/lib/feed-ranking";
 import { frequencyProvider } from "@/lib/frequency";
-import { beginReading, finishArticle, getArticle, getContentPreferences, getInterestProfile, getVocabularyProfile, getWordStates, listCandidateArticles, recordLookup, recordRecommendationSelection, saveArticleDifficulty, saveDifficultyFeedback, skipArticle } from "@/lib/storage";
+import { summarizeLookupFriction } from "@/lib/lookup-friction";
+import { unreadCandidates } from "@/lib/reading-entry";
+import { beginReading, finishArticle, getArticle, getContentPreferences, getInterestProfile, getReadingComfortProfile, getVocabularyProfile, getWordStates, listArticles, listCandidateArticles, recordLookup, recordRecommendationSelection, saveArticleDifficulty, saveDifficultyFeedback, skipArticle } from "@/lib/storage";
 import { readingMinutes, readingParagraphs, tokenizePreservingText } from "@/lib/text";
 import { lexicalContextHash, observeParagraphExposures } from "@/lib/visible-exposure";
 import type { Article, DictionaryResult, DifficultyFeedback, ReadingEntryPoint } from "@/lib/types";
@@ -37,6 +40,9 @@ export function Reader({
   const activeSegmentStartedAt = useRef<number | null>(null);
   const maxReadingProgress = useRef(0);
   const exposedWords = useRef(new Set<string>());
+  const exposedWordsByContext = useRef(new Map<string, Set<string>>());
+  const lookupWordsByContext = useRef(new Map<string, Set<string>>());
+  const contextOrder = useRef<string[]>([]);
   const sessionLookupCount = useRef(0);
   const readerCopyRef = useRef<HTMLElement | null>(null);
   const definitionRef = useRef<HTMLElement | null>(null);
@@ -78,8 +84,12 @@ export function Reader({
     if (!articleId || !readerCopy) return;
     const paragraphElements = [...readerCopy.querySelectorAll("[data-reader-paragraph]")];
     return observeParagraphExposures(articleId, paragraphElements, {
-      onVisibleWords(words) {
+      onVisibleWords(words, contextHash) {
         for (const word of words) exposedWords.current.add(word);
+        const contextWords = exposedWordsByContext.current.get(contextHash) ?? new Set<string>();
+        for (const word of words) contextWords.add(word);
+        exposedWordsByContext.current.set(contextHash, contextWords);
+        if (!contextOrder.current.includes(contextHash)) contextOrder.current.push(contextHash);
       },
     });
   }, [articleId, paragraphs]);
@@ -153,6 +163,10 @@ export function Reader({
     setDefinition(null);
     setDefinitionLoading(true);
     sessionLookupCount.current += 1;
+    const contextLookups = lookupWordsByContext.current.get(contextHash) ?? new Set<string>();
+    contextLookups.add(word);
+    lookupWordsByContext.current.set(contextHash, contextLookups);
+    if (!contextOrder.current.includes(contextHash)) contextOrder.current.push(contextHash);
     try {
       const result = await dictionaryProvider.lookup(word);
       if (lookupRequestId.current === requestId) setDefinition(result);
@@ -186,28 +200,36 @@ export function Reader({
 
   async function moveToNextArticle(result: "finished" | "skipped") {
     try {
-      const [candidates, profile, interestProfile, contentPreferences] = await Promise.all([
+      const [candidates, articles, profile, interestProfile, contentPreferences, wordStates, readingComfort] = await Promise.all([
         listCandidateArticles(),
+        listArticles(),
         getVocabularyProfile(),
         getInterestProfile(),
         getContentPreferences(),
+        getWordStates(),
+        getReadingComfortProfile(),
       ]);
-      const ranked = rankColdStartCandidates(candidates, profile, new Date(), interestProfile, contentPreferences);
-      const next = ranked[0];
-      if (next) {
-        const nextArticle = await prepareCandidateArticle(next.candidate);
+      const eligibleCandidates = filterCandidatesForReadingStage(unreadCandidates(candidates, articles), profile, readingComfort);
+      const ranked = rankColdStartCandidates(eligibleCandidates, profile, new Date(), interestProfile, contentPreferences, readingComfort);
+      if (ranked.length) {
+        const selected = await selectCandidateByFullText(ranked, profile, wordStates, readingComfort);
+        const next = selected.rankedCandidate;
+        const nextArticle = selected.article;
         const recommendation = await recordRecommendationSelection({
           candidate: next.candidate,
           articleId: nextArticle.id,
           entryPoint: "next_article",
-          rank: 1,
+          rank: selected.originalRank,
           score: next.score,
           modelVersion: next.modelVersion,
           components: next.components,
-          candidateSlate: recommendationSlate(ranked, next.candidate.id, nextArticle.id),
+          candidateSlate: recommendationSlate(ranked, next.candidate.id, nextArticle.id, 15, selected.difficulty.score),
           rankingWeights: RANKING_WEIGHTS,
           vocabularyBand: next.vocabularyBand,
           targetDifficulty: next.targetDifficulty,
+          comfortableWords: next.comfortableWords,
+          difficultyTolerance: next.difficultyTolerance,
+          successPhase: next.successPhase,
         });
         window.location.assign(`/read/${nextArticle.id}?entry=next_article&recommendation=${recommendation.id}`);
         return;
@@ -224,7 +246,8 @@ export function Reader({
   }
 
   function sessionDurationSeconds() {
-    return Math.max(0, Math.round((Date.now() - (sessionStartedAt.current ?? Date.now())) / 1000));
+    const endedAt = currentTimeMs();
+    return Math.max(0, Math.round((endedAt - (sessionStartedAt.current ?? endedAt)) / 1000));
   }
 
   function readingOutcomeMetrics() {
@@ -234,13 +257,23 @@ export function Reader({
       maxReadingProgress: Number(Math.min(1, maxReadingProgress.current).toFixed(3)),
       lookupCount: sessionLookupCount.current,
       exposedUniqueWordCount: exposedWords.current.size,
+      lookupFriction: currentLookupFriction(),
       recommendationEventId,
       entryPoint,
     };
   }
 
+  function currentLookupFriction() {
+    const contexts = contextOrder.current.map((contextHash) => ({
+      contextHash,
+      exposedUniqueWordCount: exposedWordsByContext.current.get(contextHash)?.size ?? 0,
+      lookedUpUniqueWordCount: lookupWordsByContext.current.get(contextHash)?.size ?? 0,
+    }));
+    return summarizeLookupFriction(sessionLookupCount.current, exposedWords.current.size, contexts);
+  }
+
   function currentActiveReadingSeconds() {
-    const currentSegment = activeSegmentStartedAt.current === null ? 0 : Date.now() - activeSegmentStartedAt.current;
+    const currentSegment = activeSegmentStartedAt.current === null ? 0 : currentTimeMs() - activeSegmentStartedAt.current;
     return Math.max(0, Math.round((activeReadingMs.current + currentSegment) / 1000));
   }
 
@@ -272,12 +305,23 @@ export function Reader({
                 {difficultyLabel(difficulty.label)}
               </p>
             )}
-            {article.sourceUrl && (
-              <a className="source-link" href={article.sourceUrl} target="_blank" rel="noreferrer">
+            {(article.attribution?.provenance?.originalUrl ?? article.sourceUrl) && (
+              <a className="source-link" href={article.attribution?.provenance?.originalUrl ?? article.sourceUrl ?? "#"} target="_blank" rel="noreferrer">
                 查看原文 ↗
               </a>
             )}
           </div>
+          {article.attribution?.provenance && (
+            <p className="content-attribution">
+              <span>{article.attribution.provenance.attribution}</span>
+              {article.attribution.provenance.licenseUrl ? (
+                <a href={article.attribution.provenance.licenseUrl} target="_blank" rel="noreferrer">
+                  {article.attribution.provenance.license}
+                </a>
+              ) : <span>{article.attribution.provenance.license}</span>}
+              {article.attribution.provenance.transformations.includes("excerpt") && <span>节选</span>}
+            </p>
+          )}
           <div className="reader-rule"><span />点词查看释义</div>
         </header>
 
@@ -345,6 +389,10 @@ export function Reader({
       )}
     </main>
   );
+}
+
+function currentTimeMs() {
+  return Date.now();
 }
 
 function difficultyLabel(label: DifficultyEstimate["label"]) {

@@ -162,6 +162,10 @@ function candidate(id: string): CandidateArticle {
     discoveredAt: "2026-08-29T00:00:00.000Z",
     status: "available",
     articleId: null,
+    pool: "open_web",
+    successBandMin: null,
+    successBandMax: null,
+    provenance: null,
   };
 }
 
@@ -173,6 +177,7 @@ function attribution(item: CandidateArticle) {
     topic: item.topic,
     author: item.author,
     publishedAt: item.publishedAt,
+    provenance: item.provenance,
   };
 }
 

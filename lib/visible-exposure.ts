@@ -14,7 +14,7 @@ type ExposureDependencies = {
   record?: typeof recordExposures;
   documentRef?: VisibilityDocument | null;
   visibilityDelayMs?: number;
-  onVisibleWords?: (words: readonly string[]) => void;
+  onVisibleWords?: (words: readonly string[], contextHash: string) => void;
 };
 
 const MIN_VISIBLE_RATIO = 0.2;
@@ -63,9 +63,10 @@ export function observeParagraphExposures(
         return;
       }
 
-      dependencies.onVisibleWords?.(words);
+      const contextHash = lexicalContextHash(paragraph.textContent ?? "");
+      dependencies.onVisibleWords?.(words, contextHash);
       pending.add(paragraph);
-      void record(articleId, words, lexicalContextHash(paragraph.textContent ?? "")).then(() => {
+      void record(articleId, words, contextHash).then(() => {
         pending.delete(paragraph);
         completed.add(paragraph);
         visible.delete(paragraph);

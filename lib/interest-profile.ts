@@ -1,5 +1,5 @@
 import { readingMinutes, tokenizePreservingText } from "./text.ts";
-import type { Article, CandidateArticle, InterestFeatureState, InterestProfile, RecommendationEvent } from "./types.ts";
+import type { Article, CandidateArticle, InterestFeatureState, InterestProfile, LookupFrictionMetrics, RecommendationEvent } from "./types.ts";
 
 export const INTEREST_MODEL_VERSION = 1;
 
@@ -8,7 +8,10 @@ export type InterestFeedback = {
   article: Article;
   recommendation: RecommendationEvent;
   readingTimeSeconds: number;
+  activeReadingSeconds?: number;
+  maxReadingProgress?: number;
   lookupCount: number;
+  lookupFriction?: LookupFrictionMetrics;
   timestamp?: string;
 };
 
@@ -98,20 +101,30 @@ export function extractCandidateKeywords(candidate: Pick<CandidateArticle, "titl
 
 export function interestSignal(feedback: InterestFeedback): number {
   const expectedSeconds = Math.max(60, readingMinutes(feedback.article.content) * 60);
-  const timeRatio = clamp01(feedback.readingTimeSeconds / expectedSeconds);
+  const effectiveReadingSeconds = feedback.activeReadingSeconds ?? feedback.readingTimeSeconds;
+  const timeRatio = clamp01(effectiveReadingSeconds / expectedSeconds);
   const wordCount = Math.max(1, tokenizePreservingText(feedback.article.content).filter((token) => token.type === "word").length);
-  const lookupRate = feedback.lookupCount / wordCount;
+  const lookupRate = feedback.lookupFriction
+    ? feedback.lookupFriction.lookupsPer100ExposedWords / 100
+    : feedback.lookupCount / wordCount;
   const difficultyFriction = feedback.article.userDifficultyFeedback === "too_hard"
     ? 0.7
     : clamp01(((feedback.article.estimatedDifficulty ?? 0.3) - 0.45) / 0.4);
-  const lookupFriction = clamp01((lookupRate - 0.04) / 0.12);
+  const lookupFriction = Math.max(
+    clamp01((lookupRate - 0.04) / 0.12),
+    feedback.lookupFriction?.score ?? 0,
+  );
   const confidence = 1 - Math.max(difficultyFriction, lookupFriction) * 0.65;
 
   if (feedback.outcome === "finished") {
     return roundSigned((0.3 + timeRatio * 0.55) * confidence);
   }
 
-  const quickExit = feedback.readingTimeSeconds < Math.min(30, expectedSeconds * 0.12);
+  const difficultyDrivenExit = feedback.article.userDifficultyFeedback === "too_hard"
+    || ((feedback.maxReadingProgress ?? 1) < 0.55 && lookupFriction >= 0.5);
+  if (difficultyDrivenExit) return 0;
+
+  const quickExit = effectiveReadingSeconds < Math.min(30, expectedSeconds * 0.12);
   const negative = quickExit ? -0.65 : -0.42;
   return roundSigned(negative * confidence);
 }
@@ -125,6 +138,7 @@ function updateFeature(
 ) {
   const key = featureKey(rawKey);
   if (!key) return features;
+  if (signal === 0) return features;
   const previous = features[key] ?? { score: 0, evidenceCount: 0, updatedAt: timestamp };
   const next: InterestFeatureState = {
     score: roundSigned(previous.score * 0.88 + signal * learningRate),

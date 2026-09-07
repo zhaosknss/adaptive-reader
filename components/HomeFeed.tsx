@@ -1,14 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { prepareCandidateArticle } from "@/lib/candidate-import";
+import { selectCandidateByFullText } from "@/lib/article-selection";
 import { RANKING_WEIGHTS, rankColdStartCandidates, recommendationSlate } from "@/lib/feed-ranking";
-import { selectSavedReadingArticle } from "@/lib/reading-entry";
+import { eligibleContentPools, filterCandidatesForReadingStage } from "@/lib/content-pools";
+import { selectSavedReadingArticle, unreadCandidates } from "@/lib/reading-entry";
 import {
   getVocabularyProfile,
   getContentPreferences,
   getInterestProfile,
   getLatestRecommendationEventForArticle,
+  getReadingComfortProfile,
+  getWordStates,
   listArticles,
   listCandidateArticles,
   recordRecommendationSelection,
@@ -28,12 +31,14 @@ export function HomeFeed() {
     setFailed(false);
     setMessage("");
     try {
-      const [articles, profile, interestProfile, contentPreferences, savedCandidates] = await Promise.all([
+      const [articles, profile, interestProfile, contentPreferences, savedCandidates, wordStates, readingComfort] = await Promise.all([
         listArticles(),
         getVocabularyProfile(),
         getInterestProfile(),
         getContentPreferences(),
         listCandidateArticles(),
+        getWordStates(),
+        getReadingComfortProfile(),
       ]);
 
       const savedNext = selectSavedReadingArticle(articles);
@@ -46,7 +51,8 @@ export function HomeFeed() {
 
       let candidates = savedCandidates;
       try {
-        const response = await fetch("/api/feed");
+        const pools = eligibleContentPools(profile, readingComfort);
+        const response = await fetch(`/api/feed?pools=${encodeURIComponent(pools.join(","))}`);
         const result = await response.json() as { candidates?: CandidateArticle[] };
         if (response.ok && result.candidates) {
           await upsertCandidateArticles(result.candidates);
@@ -56,36 +62,29 @@ export function HomeFeed() {
         // Existing candidates remain usable when a source refresh is unavailable.
       }
 
-      const ranked = rankColdStartCandidates(candidates, profile, new Date(), interestProfile, contentPreferences);
-      let lastError = "没有可读的新文章";
-      for (const [index, item] of ranked.entries()) {
-        try {
-          const article = await prepareCandidateArticle(item.candidate);
-          const recommendation = await recordRecommendationSelection({
-            candidate: item.candidate,
-            articleId: article.id,
-            entryPoint: "feed",
-            rank: index + 1,
-            score: item.score,
-            modelVersion: item.modelVersion,
-            components: item.components,
-            candidateSlate: recommendationSlate(ranked, item.candidate.id, article.id),
-            rankingWeights: RANKING_WEIGHTS,
-            vocabularyBand: item.vocabularyBand,
-            targetDifficulty: item.targetDifficulty,
-          });
-          window.location.assign(`/read/${article.id}?entry=feed&recommendation=${recommendation.id}`);
-          return;
-        } catch (reason) {
-          lastError = reason instanceof Error ? reason.message : lastError;
-        }
-      }
-
-      setMessage(lastError);
-      setFailed(true);
-      setOpening(false);
-    } catch {
-      setMessage("文章加载失败");
+      const eligibleCandidates = filterCandidatesForReadingStage(unreadCandidates(candidates, articles), profile, readingComfort);
+      const ranked = rankColdStartCandidates(eligibleCandidates, profile, new Date(), interestProfile, contentPreferences, readingComfort);
+      const selected = await selectCandidateByFullText(ranked, profile, wordStates, readingComfort);
+      const { article, rankedCandidate: item, difficulty } = selected;
+      const recommendation = await recordRecommendationSelection({
+        candidate: item.candidate,
+        articleId: article.id,
+        entryPoint: "feed",
+        rank: selected.originalRank,
+        score: item.score,
+        modelVersion: item.modelVersion,
+        components: item.components,
+        candidateSlate: recommendationSlate(ranked, item.candidate.id, article.id, 15, difficulty.score),
+        rankingWeights: RANKING_WEIGHTS,
+        vocabularyBand: item.vocabularyBand,
+        targetDifficulty: item.targetDifficulty,
+        comfortableWords: item.comfortableWords,
+        difficultyTolerance: item.difficultyTolerance,
+        successPhase: item.successPhase,
+      });
+      window.location.assign(`/read/${article.id}?entry=feed&recommendation=${recommendation.id}`);
+    } catch (reason) {
+      setMessage(reason instanceof Error ? reason.message : "文章加载失败");
       setFailed(true);
       setOpening(false);
     }

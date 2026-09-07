@@ -38,6 +38,12 @@ export function parseFeed(
       discoveredAt,
       status: "available" as const,
       articleId: null,
+      contentSnapshot: null,
+      pool: source.pool ?? "open_web",
+      successBandMin: null,
+      successBandMax: null,
+      readingLevel: null,
+      provenance: null,
     }];
   });
 }

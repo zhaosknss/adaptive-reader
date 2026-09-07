@@ -31,14 +31,22 @@ export class ScowlFrequencyProvider implements FrequencyProvider {
     const base = band === "very_common" ? 0.82 : band === "common" ? 0.62 : 0.34;
     if (!profile) return base;
 
-    const ability = clamp01((0.9 - profile.frequencyThreshold) / 0.6);
+    const profileBand = Math.min(5, Math.max(0, Math.round(profile.estimatedBand)));
+    const thresholdAbility = clamp01((0.9 - profile.frequencyThreshold) / 0.6);
+    const bandAbility = profileBand / 5;
+    const ability = bandAbility * 0.7 + thresholdAbility * 0.3;
     const confidence = clamp01(profile.confidence);
-    const adjustment = band === "very_common"
-      ? (ability - 0.5) * 0.08
+    const assessedPrior = band === "very_common"
+      ? 0.52 + ability * 0.38
       : band === "common"
-        ? (ability - 0.5) * 0.22
-        : (ability - 0.5) * 0.38;
-    return Number(clamp(base + adjustment * confidence, 0.08, 0.94).toFixed(2));
+        ? 0.34 + ability * 0.46
+        : 0.14 + ability * 0.46;
+    const uncertainPrior = band === "very_common" ? 0.48 : band === "common" ? 0.36 : 0.18;
+    const prior = assessedPrior * confidence + uncertainPrior * (1 - confidence);
+
+    // Once an assessment exists, uncertainty must not silently restore the
+    // optimistic population default. This matters most for band 0/1 users.
+    return Number(clamp(prior, 0.08, Math.max(uncertainPrior, base)).toFixed(2));
   }
 }
 

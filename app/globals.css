@@ -347,6 +347,11 @@ button, a { touch-action: manipulation; -webkit-tap-highlight-color: transparent
 .reader-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 18px; }
 .source-link { color: var(--muted); font-size: 11px; text-underline-offset: 3px; }
 .source-link:hover { color: var(--accent); }
+.content-attribution { display: flex; flex-wrap: wrap; gap: 4px 9px; margin: 8px 0 0; color: var(--text-muted); font-size: 10px; line-height: 1.5; }
+.content-attribution a { color: inherit; text-underline-offset: 2px; }
+.content-attribution span + span::before,
+.content-attribution span + a::before,
+.content-attribution a + span::before { content: "·"; margin-right: 9px; }
 .difficulty-note { margin: 0; padding: 5px 9px; border-radius: 999px; background: var(--primary-soft); color: var(--accent-dark); font-size: 11px; font-weight: 650; }
 .reader-rule { display: flex; align-items: center; gap: 11px; margin-top: 24px; color: var(--text-muted); font-size: 11px; }
 .reader-rule span { width: 28px; height: 1px; background: var(--border-strong); }

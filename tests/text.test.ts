@@ -84,3 +84,37 @@ test("difficulty is personal, bounded, and explainable", () => {
   const personalized = estimateDifficulty("Sesquipedalian terminology obfuscates epistemological discontinuities. Nevertheless, interdisciplinarity proliferates unpredictably.", knownRareWords);
   assert.ok(personalized.score < hard.score);
 });
+
+test("difficulty notices long and clause-heavy sentences beyond mean length", () => {
+  const familiar = commonWordStates();
+  const simple = estimateDifficulty(
+    "The child saw the bird. The bird sat by the tree. The child went home.",
+    familiar,
+  );
+  const complex = estimateDifficulty(
+    "Although the child saw the bird, which had hidden beside the tree because the storm was growing, the child waited while the branches moved, and then returned home when the rain finally began.",
+    familiar,
+  );
+
+  assert.ok(complex.metrics.sentenceLengthP90 > simple.metrics.sentenceLengthP90);
+  assert.ok(complex.metrics.clauseConnectorDensity > simple.metrics.clauseConnectorDensity);
+  assert.ok(complex.metrics.syntacticComplexity > simple.metrics.syntacticComplexity);
+  assert.ok(complex.score > simple.score);
+});
+
+function commonWordStates() {
+  return [
+    "although", "the", "child", "saw", "bird", "which", "had", "hidden", "beside", "tree",
+    "because", "storm", "was", "growing", "waited", "while", "branches", "moved", "and", "then",
+    "returned", "home", "when", "rain", "finally", "began", "sat", "by", "went",
+  ].map((word) => ({
+    word,
+    normalizedWord: word,
+    familiarity: 0.95,
+    seenCount: 5,
+    lookupCount: 0,
+    firstSeenAt: null,
+    lastSeenAt: null,
+    lastLookupAt: null,
+  }));
+}

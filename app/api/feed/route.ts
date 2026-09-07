@@ -1,27 +1,34 @@
 import { STARTER_SOURCES } from "@/lib/content-sources";
 import { builtinReadingCandidates } from "@/lib/builtin-readings";
 import { parseFeed } from "@/lib/feed";
+import { fetchReusableContentCandidates } from "@/lib/reusable-content-sources";
 import type { CandidateArticle, ContentSourceDefinition } from "@/lib/types";
 
 const MAX_FEED_BYTES = 1_500_000;
 const ITEMS_PER_SOURCE = 8;
 
-export async function GET() {
+export async function GET(request: Request) {
   const discoveredAt = new Date().toISOString();
-  const results = await Promise.allSettled(
-    STARTER_SOURCES.map((source) => fetchSource(source, discoveredAt)),
-  );
+  const requestedPools = new Set(new URL(request.url).searchParams.get("pools")?.split(",") ?? []);
+  const includeOpenWeb = requestedPools.size === 0 || requestedPools.has("open_web");
+  const [reusable, results] = await Promise.all([
+    fetchReusableContentCandidates(discoveredAt).catch(() => ({ candidates: [], failedSourceCount: 3 })),
+    includeOpenWeb
+      ? Promise.allSettled(STARTER_SOURCES.map((source) => fetchSource(source, discoveredAt)))
+      : Promise.resolve([]),
+  ]);
   const builtinCandidates = builtinReadingCandidates(discoveredAt);
   const candidates = deduplicate(
-    [...builtinCandidates, ...results.flatMap((result) => result.status === "fulfilled" ? result.value : [])],
+    [...builtinCandidates, ...reusable.candidates, ...results.flatMap((result) => result.status === "fulfilled" ? result.value : [])]
+      .filter((candidate) => requestedPools.size === 0 || requestedPools.has(candidate.pool)),
   ).sort((left, right) => (right.publishedAt ?? right.discoveredAt).localeCompare(left.publishedAt ?? left.discoveredAt));
-  const failedSourceCount = results.filter((result) => result.status === "rejected").length;
+  const failedSourceCount = reusable.failedSourceCount + results.filter((result) => result.status === "rejected").length;
 
   return Response.json(
     {
       candidates,
       failedSourceCount,
-      sourceCount: STARTER_SOURCES.length + new Set(builtinCandidates.map((candidate) => candidate.sourceId)).size,
+      sourceCount: STARTER_SOURCES.length + 2 + new Set(builtinCandidates.map((candidate) => candidate.sourceId)).size,
     },
     { headers: { "Cache-Control": "public, max-age=300" } },
   );
@@ -34,7 +41,7 @@ async function fetchSource(source: ContentSourceDefinition, discoveredAt: string
       "User-Agent": "JustRead/0.1 (+local personal reading app)",
     },
     redirect: "follow",
-    signal: AbortSignal.timeout(8000),
+    signal: AbortSignal.timeout(5000),
   });
   if (!response.ok) throw new Error(`${source.id} returned ${response.status}`);
   const length = Number(response.headers.get("content-length") ?? 0);

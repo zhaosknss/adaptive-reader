@@ -67,12 +67,12 @@ test("lower vocabulary bands prefer genuinely shorter and easier built-in readin
   const lowProfile = {
     id: "current" as const,
     estimatedBand: 0,
-    frequencyThreshold: 0.4,
+    frequencyThreshold: 0.9,
     confidence: 0.8,
     assessedAt: "2026-08-31T00:00:00.000Z",
     assessmentVersion: 1,
   };
-  const highProfile = { ...lowProfile, estimatedBand: 4, frequencyThreshold: 0.82 };
+  const highProfile = { ...lowProfile, estimatedBand: 4, frequencyThreshold: 0.42 };
 
   const lowRanked = rankColdStartCandidates(candidates, lowProfile, new Date("2026-08-31T12:00:00.000Z"));
   const highRanked = rankColdStartCandidates(candidates, highProfile, new Date("2026-08-31T12:00:00.000Z"));
@@ -114,5 +114,9 @@ function candidate(id: string, sourceId: string, topic: string, publishedAt: str
     discoveredAt: "2026-08-26T12:00:00.000Z",
     status: "available",
     articleId: null,
+    pool: "open_web",
+    successBandMin: null,
+    successBandMax: null,
+    provenance: null,
   };
 }

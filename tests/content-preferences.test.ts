@@ -96,6 +96,10 @@ function candidate(topic: string): CandidateArticle {
     discoveredAt: "2026-08-31T00:00:00.000Z",
     status: "available",
     articleId: null,
+    pool: "open_web",
+    successBandMin: null,
+    successBandMax: null,
+    provenance: null,
   };
 }
 

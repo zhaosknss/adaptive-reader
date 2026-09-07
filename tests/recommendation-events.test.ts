@@ -7,6 +7,7 @@ import {
   finishArticle,
   getInterestProfile,
   getLatestRecommendationEventForArticle,
+  getReadingComfortProfile,
   listReadingEvents,
   listRecommendationEvents,
   recordRecommendationSelection,
@@ -51,6 +52,9 @@ test("a selected candidate keeps ranking and reading-entry attribution", async (
     rankingWeights: weights(),
     vocabularyBand: 2,
     targetDifficulty: 0.24,
+    comfortableWords: 320,
+    difficultyTolerance: 0.2,
+    successPhase: true,
   });
 
   await beginReading(article, { entryPoint: "feed", recommendationEventId: recommendation.id });
@@ -60,6 +64,14 @@ test("a selected candidate keeps ranking and reading-entry attribution", async (
     maxReadingProgress: 0.93,
     lookupCount: 2,
     exposedUniqueWordCount: 104,
+    lookupFriction: {
+      lookupsPer100ExposedWords: 0,
+      maxLookupsInContext: 0,
+      maxLookupDensityByContext: 0,
+      highFrictionContextCount: 0,
+      consecutiveHighFrictionContexts: 0,
+      score: 0,
+    },
     entryPoint: "feed",
     recommendationEventId: recommendation.id,
   });
@@ -80,6 +92,14 @@ test("a selected candidate keeps ranking and reading-entry attribution", async (
     maxReadingProgress: 0.93,
     lookupCount: 2,
     exposedUniqueWordCount: 104,
+    lookupFriction: {
+      lookupsPer100ExposedWords: 0,
+      maxLookupsInContext: 0,
+      maxLookupDensityByContext: 0,
+      highFrictionContextCount: 0,
+      consecutiveHighFrictionContexts: 0,
+      score: 0,
+    },
     difficultyFeedback: null,
     finished: true,
     recordedAt: savedRecommendation.outcome?.recordedAt,
@@ -96,6 +116,7 @@ test("a selected candidate keeps ranking and reading-entry attribution", async (
   assert.equal(profile.evidenceCount, 1);
   assert.ok(profile.source["example-source"].score > 0);
   assert.ok(profile.topic.science.score > 0);
+  assert.equal((await getReadingComfortProfile()).evidenceCount, 1);
 });
 
 test("repeated completion cannot apply the same recommendation twice", async () => {
@@ -187,6 +208,10 @@ function candidate(id: string): CandidateArticle {
     discoveredAt: "2026-08-30T09:00:00.000Z",
     status: "available",
     articleId: null,
+    pool: "open_web",
+    successBandMin: null,
+    successBandMax: null,
+    provenance: null,
   };
 }
 

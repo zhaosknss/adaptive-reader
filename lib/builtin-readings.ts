@@ -1,4 +1,4 @@
-import type { CandidateArticle } from "./types.ts";
+import type { CandidateArticle, ContentType } from "./types.ts";
 
 export type BuiltinReading = {
   id: string;
@@ -257,22 +257,44 @@ export function getBuiltinReading(id: string | null | undefined) {
 }
 
 export function builtinReadingCandidates(discoveredAt: string): CandidateArticle[] {
-  return BUILTIN_READINGS.map((reading) => ({
-    id: `builtin:${reading.id}`,
-    sourceId: `library:${slug(reading.topic)}`,
-    sourceName: reading.sourceName,
-    topic: reading.topic,
-    title: reading.title,
-    url: reading.sourceUrl,
-    summary: firstParagraph(reading.content),
-    author: reading.author,
-    publishedAt: null,
-    discoveredAt,
-    status: "available",
-    articleId: null,
-    contentId: reading.id,
-    readingLevel: reading.readingLevel,
-  }));
+  return BUILTIN_READINGS.map((reading) => {
+    const sourceId = `library:${slug(reading.topic)}`;
+    const pool = reading.readingLevel <= 1 ? "success" : reading.readingLevel <= 3 ? "bridge" : "open_web";
+    return {
+      id: `builtin:${reading.id}`,
+      sourceId,
+      sourceName: reading.sourceName,
+      topic: reading.topic,
+      title: reading.title,
+      url: reading.sourceUrl,
+      summary: firstParagraph(reading.content),
+      author: reading.author,
+      publishedAt: null,
+      discoveredAt,
+      status: "available",
+      articleId: null,
+      contentId: reading.id,
+      contentSnapshot: reading.content,
+      pool,
+      successBandMin: Math.max(0, reading.readingLevel - 1),
+      successBandMax: Math.min(5, reading.readingLevel + 1),
+      readingLevel: reading.readingLevel,
+      provenance: {
+        sourceId,
+        sourceName: reading.sourceName,
+        sourceUrl: "https://www.gutenberg.org/",
+        originalUrl: reading.sourceUrl,
+        license: "Public domain in the USA",
+        licenseUrl: "https://www.gutenberg.org/policy/license.html",
+        attribution: `${reading.author}, via Project Gutenberg`,
+        author: reading.author,
+        publishedAt: null,
+        retrievedAt: discoveredAt,
+        contentType: contentTypeFor(reading.topic),
+        transformations: ["excerpt", "cleaned"],
+      },
+    } satisfies CandidateArticle;
+  });
 }
 
 function firstParagraph(content: string) {
@@ -281,4 +303,10 @@ function firstParagraph(content: string) {
 
 function slug(value: string) {
   return value.toLocaleLowerCase("en-US").replace(/[^a-z]+/g, "-").replace(/^-|-$/g, "");
+}
+
+function contentTypeFor(topic: BuiltinReading["topic"]): ContentType {
+  if (topic === "Poetry") return "poetry";
+  if (topic === "Literary Prose") return "essay";
+  return "story";
 }
