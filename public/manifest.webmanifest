@@ -2,7 +2,7 @@
   "name": "Just Read · 英文阅读",
   "short_name": "Just Read",
   "id": "/",
-  "description": "按兴趣和阅读难度推荐真实英文文章。",
+  "description": "根据词汇熟悉度和阅读反馈，为你挑选英文文章的免费开源阅读器。",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

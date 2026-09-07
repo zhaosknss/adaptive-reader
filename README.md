@@ -1,14 +1,26 @@
 # Just Read
 
-一个本地优先、手机优先的自适应英文阅读器。
+一个根据你的词汇熟悉度和阅读反馈，帮你挑选英文文章的免费开源阅读器。
+
+[在线体验](https://just-read-adaptive.equal-hippo-7177.chatgpt.site) · [English introduction](#english)
+
+<p align="center">
+  <img src="docs/screenshots/01-start-reading.png" width="240" alt="Just Read 手机端开始阅读页" />
+  <img src="docs/screenshots/02-reader-lookup.png" width="240" alt="Just Read 阅读与点词释义" />
+  <img src="docs/screenshots/03-profile.png" width="240" alt="Just Read 我的页面" />
+</p>
+
+- **打开就读**：系统直接准备下一篇，不需要先浏览和挑选文章列表。
+- **点词即查**：在正文中点击英文单词，就地查看简短中文释义。
+- **难度逐步适配**：词汇熟悉度、查词和读后反馈共同影响之后的选文，目标是让内容逐渐贴近你的阅读能力与兴趣。
+
+阅读体验就是产品本身。它不是课程、背单词软件、AI tutor 或打卡工具。
 
 项目完全开源：自有源代码采用 [MIT License](LICENSE)。内置词典、词表和阅读材料保留各自的许可证、署名与公版边界，详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 和 [内容来源说明](docs/CONTENT_SOURCES.md)。
 
-> Don't study English. Just read English.
->
-> A feed that learns both what you like and what you can understand.
+## English
 
-阅读体验是产品本身。它不是课程、背单词软件、AI tutor 或打卡工具。
+Just Read is a free, open-source English reader that chooses articles using your vocabulary familiarity and reading feedback. Open the app, start reading, tap any unfamiliar word for a short Chinese definition, then rate the difficulty and continue to the next article. The recommendation model is local, lightweight, and explainable.
 
 ## 项目状态
 
@@ -29,7 +41,7 @@
 13. “我的 → 外观”支持跟随系统/白天/黑夜，以及深海蓝、青绿色、紫灰色和炭黑色主题；偏好仅保存在当前设备。
 14. 内容分为 Success / Bridge / Open Web 三层：低等级先读短而清楚的授权原文，顺畅后再逐渐接近普通百科、新闻档案和实时网页。
 15. 内置 65 条逐页核对的 Simple English Wikipedia 原文导语快照；在线 API 不通时仍可连续阅读。每条都保存原页面、许可、署名和节选/清理标记。
-16. 公版文学池覆盖诗歌、寓言、童话、短篇故事、希腊神话和文学散文；普通 RSS 保留在 Open Web 层。
+16. 公版文学池包含 19 个阅读单元，覆盖诗歌、寓言、童话、短篇故事、希腊神话、幽默散文和书信；其中 18 个是完整作品，唯一节选会在 Reader 明确标注。普通 RSS 保留在 Open Web 层。
 17. “我的 → 阅读偏好”可选择一个“最想读”和多个“也感兴趣”；它只提供冷启动倾向，不会过滤其他类型，真实阅读行为会逐渐取得更高权重。
 
 当前 ranking 显式组合 interest、readability、freshness、exploration 和 diversity。可读性目标会随 `VocabularyProfile.estimatedBand` 调整；低等级优先完整但更短、句词更简单的内容，而不是把同一难度文章统一标成“简单”。显式阅读偏好只作为早期先验；产生新的真实阅读行为后，独立的 `InterestProfile` 会根据来源、主题和少量关键词温和调整排序，且行为证据越多，手动偏好的影响越低。它只是一套本地、可解释的偏好估计，不声称准确判断兴趣。

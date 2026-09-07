@@ -38,7 +38,7 @@
 
 ## 内置公版文学
 
-`lib/builtin-readings.ts` 保存来自 Project Gutenberg 的 9 篇完整短读或已标注节选，覆盖诗歌、寓言、童话、短篇故事、希腊神话和文学散文。来源包括：
+`lib/builtin-readings.ts` 保存来自 Project Gutenberg 的 19 个阅读单元，覆盖诗歌、寓言、童话、短篇故事、希腊神话、幽默散文和书信。其中 18 个是可独立读完的完整作品；William Hazlitt 的一篇开头片段是唯一节选，会在 Reader 中明确标注。来源包括：
 
 - Robert Louis Stevenson, *A Child's Garden of Verses*, eBook 25608
 - Christina Rossetti, *Sing-Song*, eBook 76703
@@ -46,9 +46,14 @@
 - Joseph Jacobs, *English Fairy Tales*, eBook 7439
 - L. Leslie Brooke, *The Story of the Three Little Pigs*, eBook 18155
 - Josephine Preston Peabody, *Old Greek Folk Stories Told Anew*, eBook 9313
+- Sara Teasdale, *Flame and Shadow*, eBook 591
+- Kahlil Gibran, *The Madman: His Parables and Poems*, eBook 5616
+- Jerome K. Jerome, *The Idle Thoughts of an Idle Fellow*, eBook 849
+- Elinore Pruitt Stewart, *Letters of a Woman Homesteader*, eBook 16623
+- Oscar Wilde, *The Happy Prince and Other Tales*, eBook 30120
 - William Hazlitt, *Table-Talk*, eBook 66129
 
-这些记录在 Project Gutenberg 标为美国公版；在其他国家分发前仍要核对当地版权状态。
+完整作品的 provenance 只记录 `cleaned`；真正的节选才记录 `excerpt / cleaned`。这些记录在 Project Gutenberg 标为美国公版；在其他国家分发前仍要核对当地版权状态。
 
 ## 研究后暂不采用
 

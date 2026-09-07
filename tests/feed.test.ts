@@ -59,6 +59,18 @@ test("built-in library covers literary forms and multiple reading levels", () =>
   );
   assert.ok(BUILTIN_READINGS.filter((reading) => reading.readingLevel <= 1).length >= 5);
   assert.ok(BUILTIN_READINGS.some((reading) => reading.readingLevel >= 4));
+  assert.ok(BUILTIN_READINGS.length >= 19);
+  assert.ok(BUILTIN_READINGS.some((reading) => reading.sourceName === "Letters of a Woman Homesteader"));
+  assert.ok(BUILTIN_READINGS.some((reading) => reading.sourceName === "The Madman: His Parables and Poems"));
+});
+
+test("complete built-in readings are not mislabeled as excerpts", () => {
+  const candidates = builtinReadingCandidates("2026-09-07T00:00:00.000Z");
+  const complete = candidates.find((candidate) => candidate.contentId === "the-selfish-giant");
+  const excerpt = candidates.find((candidate) => candidate.contentId === "on-going-a-journey-opening");
+
+  assert.deepEqual(complete?.provenance?.transformations, ["cleaned"]);
+  assert.deepEqual(excerpt?.provenance?.transformations, ["excerpt", "cleaned"]);
 });
 
 test("lower vocabulary bands prefer genuinely shorter and easier built-in readings", () => {

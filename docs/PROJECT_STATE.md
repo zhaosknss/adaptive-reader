@@ -41,15 +41,15 @@ Adaptive Reader 是一个本地优先、手机优先的个性化英文文章 Fee
 - 已完成 Reader 排版收敛：手机正文 18px/1.68、桌面正文 19px/1.68，长标题使用更紧凑的响应式字号；文章开头以主题色阅读引线和难度标签形成层级，底栏选中态保持克制。正文第一段若只是重复标题会在显示时去重，不修改原始文章内容。
 - 已完成本地词典：基于 MIT 许可的 ECDICT 生成 58,226 条核心词和 330,741 条扩展词。核心词按首字母加载，扩展词按前两个字母加载；本地命中不请求第三方服务，并支持常见英语词形回退。MyMemory/Free Dictionary 只补充仍未收录的词，失败占位不再进入持久缓存。
 - 已完成点词气泡收敛：修复浏览器原生 `fetch` 被错误绑定导致本地词典始终回退的问题；查词与 lookup 记录并行执行，释义不再等待 IndexedDB 写入；Reader 改为贴近所点单词的轻量指向气泡，只显示词性缩写和一个核心中文义。
-- 已完成文学内容池第一版：新增 9 篇随应用提供的公版完整短读，覆盖诗歌、寓言、童话、短篇故事、希腊神话和文学散文；实时 RSS/知识文章继续保留。Candidate 可用 `contentId` 直接准备内置正文，不经过网络提取。
+- 已完成文学内容池第二批：内置公版文学由 9 个增至 19 个阅读单元，新增 Sara Teasdale 完整诗歌、Kahlil Gibran 完整寓言/散文诗、Jerome K. Jerome 完整序言、Elinore Pruitt Stewart 完整书信和 Oscar Wilde 完整童话。当前 18 个是完整作品，只有 Hazlitt 开头片段保留 `excerpt` 标记；实时 RSS/知识文章继续保留。Candidate 仍以 `contentId` 直接准备内置正文，不经过网络提取。
 - 已完成低等级选文修正：ranking model v5 不再使用固定 `0.3` 难度目标，而是同时依据 VocabularyProfile 分档、完整正文难度、策划等级和舒适篇幅计算 readability；Success Phase 额外拒绝明显高于当前档位的已标注内容，并排除已经 finished/skipped 的候选，避免重复推荐。
 - 已完成显式阅读偏好：阅读偏好页可选一个“最想读”和多个“也感兴趣”；全部取消时自动回到开放探索。偏好只作为冷启动先验，不过滤其他类型；随着 InterestProfile 行为证据增加，手动偏好权重从 0.62 逐步降至最低 0.18。ranking model 更新为 v4。
 - 已完成 Vinext 生产预取兼容：内部导航暂用普通文档链接，避免当前 Vinext beta 的 `next/link` RSC prefetch 初始化报错；IndexedDB 数据与阅读状态不受整页导航影响。
 - 本地基线提交：`e802093`（`chore: establish adaptive reader baseline`），未推送。
-- 当前内容池结论：9 篇公版文学仍保留，但低等级主供给已转为 65 条有完整出处的现代百科导语。离线全文检查确认严格 band 0 有至少 30 条 Success 候选可接受；band 1 在开放 Success+Bridge 后有至少 50 条可接受。没有为了凑数量放宽 difficulty 权重。
+- 当前内容池结论：19 个公版文学阅读单元与 65 条有完整出处的现代百科导语并存。新增文学主要进入 Bridge，不挤占 band 0 的 Success 供给；离线全文检查确认严格 band 0 有至少 30 条 Success 候选可接受，band 1 在开放 Success+Bridge 后有至少 50 条可接受。没有为了凑数量放宽 difficulty 权重。
 - 本阶段边界：65 条快照按原页面 URL 去重后是 64 个候选（Electricity 跨池重复）；不能把原始条目数当作合格候选数。尚未达到“band 1 首次严格 Success Phase 即有 50 条”的更强目标。内容仍偏百科，自然/生活主题较多，短新闻与人物内容主要在 Bridge。
 - 阶段过渡边界：测试覆盖不同 vocabularyBand 与 successPhase 下的池门控，最终仍要通过全文检查；当前词汇档位依赖测评/重测，不声称读完十篇就自动升档。band 0 即使开放 Bridge，也不会绕过候选最低 band 1 的限制。
-- 已确认完全开源方向并完成公开前准备：自有源代码采用 MIT License；ECDICT、SCOWL、Simple English Wikipedia、Wikinews 与 Project Gutenberg 内容继续遵守各自许可和公版地域边界。根目录已增加 `LICENSE`、`THIRD_PARTY_NOTICES.md` 和 `CONTRIBUTING.md`，README 已改为明确的开源说明。GitHub 仓库当前仍为 Private，必须在最新代码提交并再次确认后才切换 Public。
+- 已确认完全开源方向：自有源代码采用 MIT License；ECDICT、SCOWL、Simple English Wikipedia、Wikinews 与 Project Gutenberg 内容继续遵守各自许可和公版地域边界。GitHub 仓库 `zhaosknss/adaptive-reader` 已公开；本轮内容补充尚未推送或部署。
 
 ## 已确认的稳定能力
 
@@ -67,7 +67,7 @@ Adaptive Reader 是一个本地优先、手机优先的个性化英文文章 Fee
 - 阶段 B/C 验证：lint、typecheck、14 项测试、生产 build 通过；浏览器已走完测评、刷新持久化和 Reader 点词回归，并检查 390×844 与 360×800。
 - 5 个 StarterSource 通过 RSS/Atom 发现 Open Web 轻量候选；每个来源限 8 条、1.5 MB、5 秒超时，单源失败隔离。
 - Simple English Wikipedia 提供 45 条 Success 与 20 条 Bridge 的本地原文快照以及在线 API 更新路径；本机网络实测 Wikimedia API 超时后，`/api/feed?pools=success` 约 1.2 秒返回 50 条 Success 候选（含原有文学），核心流程不再依赖该外网可达性。
-- 内置文学候选与 RSS 候选进入同一 CandidateArticle、ranking、RecommendationEvent、Article attribution、Reader 和行为反馈闭环。当前运行时 Feed 共返回 9 个内置候选，其中 5 个为 0～1 级；外部 RSS 全部失败时仍有内容可读。
+- 内置文学候选与 RSS 候选进入同一 CandidateArticle、ranking、RecommendationEvent、Article attribution、Reader 和行为反馈闭环。当前运行时 Feed 共返回 19 个内置候选，其中 5 个为 0～1 级；外部 RSS 全部失败时仍有内容可读。
 - Candidate 的持久 `articleId` 是主链接；Article 的 attribution 保存首次 candidate/source/topic 快照。URL 会去除 fragment 并规范化 host，避免常见形式差异造成重复文章。
 - ranking 显式组合 interest、readability、freshness、exploration 和 diversity；冷启动时 interest 保持中性，产生新反馈后才温和变化。
 - 显式阅读偏好只参与 interest 分量的起始估计；“先都看看”保持中性探索，主偏好、次偏好和其他类型均获得非零分数，不会形成硬筛选。
@@ -94,6 +94,7 @@ Adaptive Reader 是一个本地优先、手机优先的个性化英文文章 Fee
 - 页面重心与卡片入口验证：lint、typecheck、67 项测试和生产 build 通过；浏览器逐页检查 390×844、360×800 与 1280×900，阅读首页、“我的”、词汇量、阅读偏好、外观、设置和 Reader 均无横向溢出或控制台错误。Reader 未修改。
 - 最低等级真实使用修复验证：lint、typecheck、78 项测试和生产 build 通过。隔离的新用户环境中连续 20 次选择“不认识”得到 band 0；第一篇实际进入 42 词的 `Who Has Seen the Wind?`，`trembling → adj. 发抖的` 本地释义正常；选择“正合适”并点“下一篇”后直接进入 24 词的 `Rain`。390×844 与 360×800 无横向溢出或控制台错误。Reader 视觉未修改。
 - 三层内容池验证（2026-09-04）：lint、typecheck、91 项测试、生产 build 通过；本次恢复后再次运行 91 项测试全部通过。浏览器在隔离的 `127.0.0.1` 来源完成 20 次“不认识”测评，个人页显示 band 0。390×844 下连续执行 10 次“正合适 → 下一篇”：Forest、Tree、Bread、Medicine、Who Has Seen the Wind?、Photography、Water、Air、Ice、River，然后进入百科 Rain；没有耗尽或进入长新闻。Forest 点词显示 `n. 森林`。360×800 下刷新仍保留 Rain，历史页有 11 篇记录、个人页保留 1 个查词；两种宽度无横向溢出，浏览器未捕获运行错误。测试为流程模拟，不代表真实读者理解了内容或完整阅读了每段。视口已恢复；未清理用户 localhost 数据，未推送或重新部署。
+- 完整文学补充验证（2026-09-07）：lint、typecheck、92 项测试和生产 build 通过；自动测试确认完整作品不再误带 `excerpt`，现有 Hazlitt 片段仍明确标注节选。API 实测返回 19 个内置文学候选，其中 18 个完整作品、1 个明确节选。本轮未改 Reader/UI，因此不再继续重复浏览器回归。
 
 ## 阶段 G/H 的已实现边界
 
