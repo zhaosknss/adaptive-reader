@@ -103,7 +103,7 @@ export function HomeFeed() {
           onClick={() => void openNextArticle()}
           disabled={opening}
         >
-          {opening ? "正在加载…" : failed ? "重试" : "开始阅读"}
+          {opening ? "正在加载…" : failed ? "重试" : <><span>开始阅读</span><span className="button-arrow" aria-hidden="true">→</span></>}
         </button>
         {message && <p className="reading-start-message" role="alert">{message}</p>}
       </section>

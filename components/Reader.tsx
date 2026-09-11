@@ -34,6 +34,7 @@ export function Reader({
   const [definitionPosition, setDefinitionPosition] = useState<DefinitionPosition | null>(null);
   const [finishing, setFinishing] = useState(false);
   const [difficulty, setDifficulty] = useState<DifficultyEstimate | null>(null);
+  const [titleExpanded, setTitleExpanded] = useState(false);
   const started = useRef(false);
   const sessionStartedAt = useRef<number | null>(null);
   const activeReadingMs = useRef(0);
@@ -285,6 +286,8 @@ export function Reader({
     return <main className="reader-state"><span className="reader-loading">J</span></main>;
   }
 
+  const titleIsLong = article.title.trim().length > 72;
+
   return (
     <main className="reader-shell">
       <header className="reader-topbar">
@@ -297,8 +300,17 @@ export function Reader({
 
       <article className="reader-article">
         <header className="reader-title">
-          <p className="eyebrow">JUST READ</p>
-          <h1>{article.title}</h1>
+          <div className={`reader-title-heading ${titleIsLong && !titleExpanded ? "is-collapsed" : ""}`}>
+            <h1>{article.title}</h1>
+            {titleIsLong && (
+              <button
+                type="button"
+                className="reader-title-toggle"
+                aria-expanded={titleExpanded}
+                onClick={() => setTitleExpanded((expanded) => !expanded)}
+              >{titleExpanded ? "收起" : "展开"}</button>
+            )}
+          </div>
           <div className="reader-meta">
             {difficulty && (
               <p className={`difficulty-note ${difficulty.label}`}>
@@ -322,7 +334,6 @@ export function Reader({
               {article.attribution.provenance.transformations.includes("excerpt") && <span>节选</span>}
             </p>
           )}
-          <div className="reader-rule"><span />点词查看释义</div>
         </header>
 
         <section className="reader-copy" aria-label="英文正文" ref={readerCopyRef}>
