@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { selectCandidateByFullText } from "../lib/article-selection.ts";
+import { builtinReadingCandidates } from "../lib/builtin-readings.ts";
 import { filterCandidatesForReadingStage } from "../lib/content-pools.ts";
 import { rankColdStartCandidates } from "../lib/feed-ranking.ts";
 import { initialReadingComfortProfile } from "../lib/reading-comfort.ts";
@@ -116,6 +117,47 @@ test("success phase does not admit a much higher declared reading level even whe
   assert.equal(selected.rankedCandidate.candidate.id, beginner.id);
 });
 
+test("success phase preserves ranking when acceptable articles have nearly equal comfort", async () => {
+  const profile: VocabularyProfile = {
+    id: "current",
+    estimatedBand: 0,
+    frequencyThreshold: 0.9,
+    confidence: 1,
+    assessedAt: "2026-09-02T00:00:00.000Z",
+    assessmentVersion: 1,
+  };
+  const comfort = initialReadingComfortProfile(profile);
+  const preferredStory = { ...candidate("preferred-story", "2026-09-02T09:00:00.000Z"), readingLevel: 0 };
+  const slightlyEasierArticle = { ...candidate("slightly-easier", "2026-09-01T09:00:00.000Z"), readingLevel: 0 };
+  const ranked = rankColdStartCandidates(
+    [preferredStory, slightlyEasierArticle],
+    profile,
+    new Date("2026-09-02T10:00:00.000Z"),
+    null,
+    null,
+    comfort,
+  );
+
+  const selected = await selectCandidateByFullText(ranked, profile, [], comfort, {
+    async inspect(item) {
+      const repeats = item.id === preferredStory.id ? 18 : 16;
+      return {
+        title: item.title,
+        content: Array.from({ length: repeats }, () => "The child sees the small bird.").join(" "),
+        sourceUrl: item.url,
+        existingArticle: null,
+      };
+    },
+    async materialize(item, draft) {
+      return article(item.id, draft.content);
+    },
+    async saveDifficulty() {},
+  });
+
+  assert.equal(ranked[0].candidate.id, preferredStory.id);
+  assert.equal(selected.rankedCandidate.candidate.id, preferredStory.id);
+});
+
 test("a fresh band 0 reader can select ten different success items without exhausting the pool", async () => {
   const profile: VocabularyProfile = {
     id: "current",
@@ -189,6 +231,44 @@ test("a fresh band 0 reader can complete ten real reusable reads without exhaust
 
   assert.equal(new Set(selectedTitles).size, 10);
   assert.ok(remaining.length >= 20);
+});
+
+test("a fresh band 0 slate surfaces authentic literature without relaxing the comfort gate", async () => {
+  const profile: VocabularyProfile = {
+    id: "current",
+    estimatedBand: 0,
+    frequencyThreshold: 0.9,
+    confidence: 1,
+    assessedAt: "2026-09-12T00:00:00.000Z",
+    assessmentVersion: 1,
+  };
+  const comfort = initialReadingComfortProfile(profile);
+  const reusable = await fetchReusableContentCandidates(
+    "2026-09-12T00:00:00.000Z",
+    async () => { throw new Error("offline"); },
+  );
+  let remaining = filterCandidatesForReadingStage([
+    ...builtinReadingCandidates("2026-09-12T00:00:00.000Z"),
+    ...reusable.candidates,
+  ], profile, comfort);
+  const selectedContentIds: Array<string | null | undefined> = [];
+
+  for (let turn = 0; turn < 3; turn += 1) {
+    const ranked = rankColdStartCandidates(remaining, profile, new Date("2026-09-12T00:00:00.000Z"), null, null, comfort);
+    const selected = await selectCandidateByFullText(ranked, profile, [], comfort, {
+      async inspect(item) {
+        return { title: item.title, content: item.contentSnapshot ?? "", sourceUrl: item.url, existingArticle: null };
+      },
+      async materialize(item, draft) {
+        return article(item.id, draft.content);
+      },
+      async saveDifficulty() {},
+    });
+    selectedContentIds.push(selected.rankedCandidate.candidate.contentId);
+    remaining = remaining.filter((item) => item.id !== selected.rankedCandidate.candidate.id);
+  }
+
+  assert.ok(selectedContentIds.some(Boolean));
 });
 
 function candidate(id: string, publishedAt: string): CandidateArticle {

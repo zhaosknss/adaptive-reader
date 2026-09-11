@@ -8,6 +8,7 @@ import type { Article, ReadingComfortProfile, VocabularyProfile, WordState } fro
 
 export const FULL_TEXT_CANDIDATE_LIMIT = 5;
 export const LOCAL_FALLBACK_LIMIT = 20;
+export const SUCCESS_FIT_TOLERANCE = 0.06;
 
 export type FullTextSelection = {
   article: Article;
@@ -78,7 +79,7 @@ export async function selectCandidateByFullText(
   }
 
   const selected = readingComfort?.successPhase
-    ? acceptable.sort((left, right) => right.comfortAssessment.fitScore - left.comfortAssessment.fitScore || left.index - right.index)[0]
+    ? selectSuccessCandidate(acceptable)
     : acceptable[0];
   const article = await materialize(selected.item.candidate, selected.draft);
   await saveDifficulty(article.id, selected.difficulty.score);
@@ -90,4 +91,11 @@ export async function selectCandidateByFullText(
     difficulty: selected.difficulty,
     comfortAssessment: selected.comfortAssessment,
   };
+}
+
+function selectSuccessCandidate<T extends { index: number; comfortAssessment: ArticleComfortAssessment }>(acceptable: T[]) {
+  const bestFit = Math.max(...acceptable.map((item) => item.comfortAssessment.fitScore));
+  return acceptable
+    .filter((item) => item.comfortAssessment.fitScore >= bestFit - SUCCESS_FIT_TOLERANCE)
+    .sort((left, right) => left.index - right.index)[0];
 }

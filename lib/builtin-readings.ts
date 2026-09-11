@@ -27,6 +27,68 @@ It rains on the umbrellas here,
 And on the ships at sea.`,
   },
   {
+    id: "at-the-sea-side",
+    title: "At the Sea-Side",
+    author: "Robert Louis Stevenson",
+    topic: "Poetry",
+    readingLevel: 0,
+    sourceName: "A Child's Garden of Verses",
+    sourceUrl: "https://www.gutenberg.org/ebooks/25608?just-read=at-the-sea-side",
+    content: `When I was down beside the sea
+A wooden spade they gave to me
+To dig the sandy shore.
+
+My holes were empty like a cup.
+In every hole the sea came up,
+Till it could come no more.`,
+  },
+  {
+    id: "bed-in-summer",
+    title: "Bed in Summer",
+    author: "Robert Louis Stevenson",
+    topic: "Poetry",
+    readingLevel: 1,
+    sourceName: "A Child's Garden of Verses",
+    sourceUrl: "https://www.gutenberg.org/ebooks/25608?just-read=bed-in-summer",
+    content: `In winter I get up at night
+And dress by yellow candle-light.
+In summer, quite the other way,
+I have to go to bed by day.
+
+I have to go to bed and see
+The birds still hopping on the tree,
+Or hear the grown-up peoples' feet
+Still going past me in the street.
+
+And does it not seem hard to you,
+When all the sky is clear and blue,
+And I should like so much to play,
+To have to go to bed by day?`,
+  },
+  {
+    id: "the-cow",
+    title: "The Cow",
+    author: "Robert Louis Stevenson",
+    topic: "Poetry",
+    readingLevel: 1,
+    sourceName: "A Child's Garden of Verses",
+    sourceUrl: "https://www.gutenberg.org/ebooks/25608?just-read=the-cow",
+    content: `The friendly cow all red and white,
+I love with all my heart:
+She gives me cream with all her might,
+To eat with apple-tart.
+
+She wanders lowing here and there,
+And yet she cannot stray,
+All in the pleasant open air,
+The pleasant light of day;
+
+And blown by all the winds that pass
+And wet with all the showers,
+She walks among the meadow grass
+And eats the meadow flowers.`,
+  },
+  {
     id: "who-has-seen-the-wind",
     title: "Who Has Seen the Wind?",
     author: "Christina Rossetti",
@@ -86,6 +148,54 @@ Some days later, while stalking his prey in the forest, the Lion was caught in t
 "You laughed when I said I would repay you," said the Mouse. "Now you see that even a Mouse can help a Lion."
 
 A kindness is never wasted.`,
+  },
+  {
+    id: "the-boy-and-the-nettle",
+    title: "The Boy and the Nettle",
+    author: "Aesop",
+    topic: "Fables",
+    readingLevel: 1,
+    sourceName: "The Aesop for Children",
+    sourceUrl: "https://www.gutenberg.org/ebooks/19994?just-read=boy-and-nettle",
+    content: `A Boy, stung by a Nettle, ran home crying, to get his mother to blow on the hurt and kiss it.
+
+"Son," said the Boy's mother, when she had comforted him, "the next time you come near a Nettle, grasp it firmly, and it will be as soft as silk."
+
+Whatever you do, do with all your might.`,
+  },
+  {
+    id: "the-ant-and-the-dove",
+    title: "The Ant and the Dove",
+    author: "Aesop",
+    topic: "Fables",
+    readingLevel: 1,
+    sourceName: "The Aesop for Children",
+    sourceUrl: "https://www.gutenberg.org/ebooks/19994?just-read=ant-and-dove",
+    content: `A Dove saw an Ant fall into a brook. The Ant struggled in vain to reach the bank, and in pity, the Dove dropped a blade of straw close beside it. Clinging to the straw like a shipwrecked sailor to a broken spar, the Ant floated safely to shore.
+
+Soon after, the Ant saw a man getting ready to kill the Dove with a stone. But just as he cast the stone, the Ant stung him in the heel, so that the pain made him miss his aim, and the startled Dove flew to safety in a distant wood.
+
+A kindness is never wasted.`,
+  },
+  {
+    id: "the-fox-and-the-grapes",
+    title: "The Fox and the Grapes",
+    author: "Aesop",
+    topic: "Fables",
+    readingLevel: 2,
+    sourceName: "The Aesop for Children",
+    sourceUrl: "https://www.gutenberg.org/ebooks/19994?just-read=fox-and-grapes",
+    content: `A Fox one day spied a beautiful bunch of ripe grapes hanging from a vine trained along the branches of a tree. The grapes seemed ready to burst with juice, and the Fox's mouth watered as he gazed longingly at them.
+
+The bunch hung from a high branch, and the Fox had to jump for it. The first time he jumped he missed it by a long way. So he walked off a short distance and took a running leap at it, only to fall short once more. Again and again he tried, but in vain.
+
+Now he sat down and looked at the grapes in disgust.
+
+"What a fool I am," he said. "Here I am wearing myself out to get a bunch of sour grapes that are not worth gaping for."
+
+And off he walked very, very scornfully.
+
+There are many who pretend to despise and belittle that which is beyond their reach.`,
   },
   {
     id: "teeny-tiny",

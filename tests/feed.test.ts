@@ -57,9 +57,9 @@ test("built-in library covers literary forms and multiple reading levels", () =>
     [...topics].sort(),
     ["Fairy Tales", "Fables", "Greek Mythology", "Literary Prose", "Poetry", "Short Stories"].sort(),
   );
-  assert.ok(BUILTIN_READINGS.filter((reading) => reading.readingLevel <= 1).length >= 5);
+  assert.ok(BUILTIN_READINGS.filter((reading) => reading.readingLevel <= 1).length >= 10);
   assert.ok(BUILTIN_READINGS.some((reading) => reading.readingLevel >= 4));
-  assert.ok(BUILTIN_READINGS.length >= 19);
+  assert.ok(BUILTIN_READINGS.length >= 25);
   assert.ok(BUILTIN_READINGS.some((reading) => reading.sourceName === "Letters of a Woman Homesteader"));
   assert.ok(BUILTIN_READINGS.some((reading) => reading.sourceName === "The Madman: His Parables and Poems"));
 });

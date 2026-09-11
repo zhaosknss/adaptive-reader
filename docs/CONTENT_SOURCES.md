@@ -38,7 +38,7 @@
 
 ## 内置公版文学
 
-`lib/builtin-readings.ts` 保存来自 Project Gutenberg 的 19 个阅读单元，覆盖诗歌、寓言、童话、短篇故事、希腊神话、幽默散文和书信。其中 18 个是可独立读完的完整作品；William Hazlitt 的一篇开头片段是唯一节选，会在 Reader 中明确标注。来源包括：
+`lib/builtin-readings.ts` 保存来自 Project Gutenberg 的 25 个阅读单元，覆盖诗歌、寓言、童话、短篇故事、希腊神话、幽默散文和书信。其中 24 个是可独立读完的完整作品；William Hazlitt 的一篇开头片段是唯一节选，会在 Reader 中明确标注。新增的短诗与寓言优先补足 band 0/1 的文学供给，但进入 Reader 前仍需通过完整正文难度检查。来源包括：
 
 - Robert Louis Stevenson, *A Child's Garden of Verses*, eBook 25608
 - Christina Rossetti, *Sing-Song*, eBook 76703
